@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>深谋远虑 — 工程骨架</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #101820; overflow: hidden; }
+    canvas { display: block; }
+    /* 统一字体：Maple Mono Normal CN（CJK 字形图集分桶补丁后的 KAPLAY 才能稳定渲染大量中文）。
+       KAPLAY text 组件只接受字体名字符串（无 weight 通道），所以每个字重独立 family：
+       桥 compText 的 weight 参数（400/600/700）映射到对应 family 名。 */
+    @font-face { font-family: "MapleMonoCN"; src: url(vendor/fonts/MapleMonoNormal-CN-Regular.ttf?v=20261101) format("truetype"); }
+    @font-face { font-family: "MapleMonoCN-Semibold"; src: url(vendor/fonts/MapleMonoNormal-CN-SemiBold.ttf?v=20261101) format("truetype"); }
+    @font-face { font-family: "MapleMonoCN-Bold"; src: url(vendor/fonts/MapleMonoNormal-CN-Bold.ttf?v=20261101) format("truetype"); }
+    /* 竖屏手持：把横屏画布旋转 90 度铺满竖屏（机制沿用 GameDemo 壳）。
+       画布元素盒宽 = 100vh、高 = 100vw，左上角放到屏幕右侧顶点 (left:100vw)，
+       再绕 top-left 顺时针 rotate(90deg)，正好覆盖整屏；KAPLAY 看到的仍是横屏元素盒。 */
+    @media (orientation: portrait) {
+      body > canvas {
+        position: absolute !important;
+        top: 0;
+        left: 100vw;
+        width: 100vh !important;
+        height: 100vw !important;
+        transform: rotate(90deg);
+        transform-origin: top left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 三段载入：KAPLAY -> 桥运行时（op 注册表 + __subl.call 分派）->
+       Sublimation 编译产物（--target=browser 的 S-1 形态，main 不自执行）。
+       查询串 v=20261101 为缓藏戳：静态资源以文件名+版本戳失效缓存，
+       每次发版同步更新三处脚本与三处字体的戳。 -->
+  <script src="vendor/kaplay.js?v=20261101"></script>
+  <script src="js/game-runtime.js?v=20261101"></script>
+  <script src="app.js?v=20261101"></script>
+  <script>
+    // S-1 装载模型：宿主在脚本装载完成后调用导出的 main。
+    // 等 Maple Mono Normal CN 就绪（Canvas 文字首帧即可用到正确字体）。
+    (function () {
+      var families = ["MapleMonoCN", "MapleMonoCN-Semibold", "MapleMonoCN-Bold"];
+      var ready = families.map(function (f) {
+        try { return document.fonts.load("16px " + f); } catch (e) { return Promise.resolve(); }
+      });
+      return Promise.all(ready).catch(function () {}).then(function () { globalThis.__subl.main(); });
+    })().catch(function (e) {
+      document.body.insertAdjacentHTML("beforeend",
+        "<pre style=\"color:#f88;padding:8px\">[深谋远虑] main 运行失败：" + String(e) + "</pre>");
+    });
+  </script>
+</body>
+</html>

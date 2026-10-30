@@ -1,0 +1,10 @@
+# 构建产物
+build/
+build-input-*/
+
+# 浏览器探针截图（test/browser-check.js 每次重生成）
+test/browser-screenshot.png
+
+# 编辑器/系统杂物
+.DS_Store
+*.swp

@@ -1,0 +1,195 @@
+// main.subl —— 《深谋远虑》工程骨架冒烟场景（无剧情玩法）
+// 引擎链路验证（GameDemo 东亚地图技术验证的极简版）：
+//   mapLoad 烘焙硬边精灵（扫描线填充 + Bresenham 描边）
+//   -> mapProvObj 渲染期 compColorHex tint
+//   -> mapHitProv 射线法命中（凹多边形/多环）
+//   -> 相机缩放（滚轮锚定光标）/ 平移（拖拽钳制）/ 点击选中。
+// 地块数据见 smoke-data.subl（三地块：凹形/菱形/带洞，各验一项能力）。
+
+// ---------- 画布与布局 ----------
+fun VIEW_W(): Rat = 960.0
+fun VIEW_H(): Rat = 540.0
+fun TITLE_H(): Rat = 36.0
+
+// ---------- 地图包围盒（世界像素；smoke-data.subl 三地块的极值） ----------
+fun TX0(): Rat = 140.0
+fun TX1(): Rat = 700.0
+fun TY0(): Rat = 90.0
+fun TY1(): Rat = 520.0
+fun INIT_X(): Rat = ((TX0() + TX1()) / 2.0)
+fun INIT_Y(): Rat = ((TY0() + TY1()) / 2.0)
+
+// ---------- 颜色 ----------
+fun COL_BG(): Str = "#101820"
+fun COL_TITLE(): Str = "#F0F4F8"
+fun COL_SUB(): Str = "#8FA3B8"
+fun FILL_SEL(): Str = "#FFC107"
+fun blockHex(i: Nat): Str =
+    if (i == 0) "#4A6FA5"
+    else (if (i == 1) "#6A8E5A" else "#A5785A")
+
+// ---------- 相机（自由缩放；数学与 GameDemo 地图 demo 同构） ----------
+fun CTR_X(): Rat = 480.0
+fun CTR_Y(): Rat = 270.0
+fun ZOOM_MIN(): Rat = 1.0
+fun ZOOM_MAX(): Rat = 4.0
+fun ZOOM_STEP(): Rat = 1.15
+fun PAD(): Rat = 8.0
+fun DRAG_THRESHOLD(): Rat = 8.0
+
+fun visW(viewS: Rat): Rat = (VIEW_W() / viewS)
+fun visH(viewS: Rat): Rat = (VIEW_H() / viewS)
+fun panMinX(viewS: Rat): Rat = ((TX0() - PAD()) + (visW(viewS) / 2.0))
+fun panMaxX(viewS: Rat): Rat = ((TX1() + PAD()) - (visW(viewS) / 2.0))
+fun panMinY(viewS: Rat): Rat = ((TY0() - PAD()) + (visH(viewS) / 2.0))
+fun panMaxY(viewS: Rat): Rat = ((TY1() + PAD()) - (visH(viewS) / 2.0))
+fun clampS(v: Rat, lo: Rat, hi: Rat): Rat = if (v < lo) lo else (if (v > hi) hi else v)
+fun clampP(v: Rat, lo: Rat, hi: Rat): Rat = if (lo > hi) ((lo + hi) / 2.0) else (if (v < lo) lo else (if (v > hi) hi else v))
+fun distAbs(a: Rat, b: Rat): Rat = if (a > b) (a - b) else (b - a)
+fun screenXOf(viewS: Rat, viewX: Rat, w: Rat): Rat = (((w - viewX) * viewS) + CTR_X())
+fun screenYOf(viewS: Rat, viewY: Rat, w: Rat): Rat = (((w - viewY) * viewS) + CTR_Y())
+fun worldXOf(viewS: Rat, viewX: Rat, s: Rat): Rat = (((s - CTR_X()) / viewS) + viewX)
+fun worldYOf(viewS: Rat, viewY: Rat, s: Rat): Rat = (((s - CTR_Y()) / viewS) + viewY)
+fun zoomViewXAt(viewS: Rat, viewX: Rat, wa: Rat, ns: Rat): Rat = (wa - ((screenXOf(viewS, viewX, wa) - CTR_X()) / ns))
+fun zoomViewYAt(viewS: Rat, viewY: Rat, wa: Rat, ns: Rat): Rat = (wa - ((screenYOf(viewS, viewY, wa) - CTR_Y()) / ns))
+fun panXOf(viewS: Rat, viewX: Rat, dx: Rat): Rat = clampP((viewX - (dx / viewS)), panMinX(viewS), panMaxX(viewS))
+fun panYOf(viewS: Rat, viewY: Rat, dy: Rat): Rat = clampP((viewY - (dy / viewS)), panMinY(viewS), panMaxY(viewS))
+
+// ---------- 文案 ----------
+fun titleText(): Str = "深谋远虑"
+fun hintLabel(): Str = "骨架冒烟：点击地块 · 拖拽平移 · 滚轮缩放"
+fun selLabel(name: Str): Str = concat("已选：", name)
+
+// ---------- 渲染 ----------
+// 带颜色的文本对象（fixed + z=10 钉在顶栏层）。
+@impure
+fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, hex: Str, tag: Str, fixed: Bool): Any {
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(x, y))
+    unchecked objUse(o, compText(t, size, 400))
+    unchecked objUse(o, compColorHex(hex))
+    unchecked if (fixed) { objUse(o, compFixed()); objUse(o, compZ(10.0)) }
+    unchecked objTag(o, tag)
+    return o
+}
+
+// 地块渲染：按地块色 tint；选中换金。整块重建（骨架阶段地块少，直接全建）。
+@impure
+fun renderBlocksLoop(geo: Any, n: Nat, i: Nat, sel: Int): Null =
+    if (i >= n) null
+    else {
+        var hex: Str = if (i == sel) FILL_SEL() else blockHex(i)
+        var o: Any = mapProvObj(geo, i, hex)
+        objTag(o, "block")
+        renderBlocksLoop(geo, n, (i + 1), sel)
+    }
+
+@impure
+fun renderBlocks(geo: Any, n: Nat, sel: Int): Null = renderBlocksLoop(geo, n, 0, sel)
+
+// 相机只改 camPos/camScale（渲染期变换），不重建地块。
+@impure
+fun applyView(viewS: Rat, viewX: Rat, viewY: Rat): Null {
+    camPos(viewX, viewY)
+    camScale(viewS, viewS)
+    null
+}
+
+// 点击选中：命中地块 -> 换金 + 更新标签（未命中保持原选中）。
+@impure
+fun selectAt(geo: Any, n: Nat, label: Any, sel: Int, wx: Rat, wy: Rat): Int {
+    var hit: Int = mapHitProv(geo, wx, wy)
+    @mut var r: Int = sel
+    if (hit >= 0) {
+        if (hit != sel) {
+            objsDestroyTag("block")
+            r = hit
+            renderBlocks(geo, n, hit)
+            objTextSet(label, selLabel(mapProvName(geo, hit)))
+        }
+    }
+    return r
+}
+
+@impure
+fun runSmoke(): Null {
+    var geo: Any = mapLoad(MAP_T())
+    var n: Nat = mapProvCount(geo)
+    // 海面背景：扩到地块包围盒 + PAD。
+    var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_BG())
+    objTag(bg, "ui")
+    // 顶栏：fixed + z=10 固定屏幕坐标，盖在地块之上。
+    var tbar: Any = objAdd()
+    unchecked objUse(tbar, compRect(VIEW_W(), TITLE_H()))
+    unchecked objUse(tbar, compPos(0.0, 0.0))
+    unchecked objUse(tbar, compColorHex(COL_BG()))
+    unchecked objUse(tbar, compFixed())
+    unchecked objUse(tbar, compZ(10.0))
+    unchecked objTag(tbar, "ui")
+    var title: Any = addTextT(titleText(), 14.0, 8.0, 18.0, COL_TITLE(), "ui", true)
+    var label: Any = addTextT(hintLabel(), 230.0, 13.0, 15.0, COL_SUB(), "ui", true)
+    @mut var sel: Int = -1
+    @mut var viewS: Rat = 1.0
+    @mut var viewX: Rat = INIT_X()
+    @mut var viewY: Rat = INIT_Y()
+    @mut var pressX: Rat = 0.0
+    @mut var pressY: Rat = 0.0
+    @mut var lastX: Rat = 0.0
+    @mut var lastY: Rat = 0.0
+    @mut var pressed: Bool = false
+    @mut var moved: Bool = false
+    renderBlocks(geo, n, -1)
+    applyView(viewS, viewX, viewY)
+    onScroll { dy =>
+        var f: Rat = if (dy > 0.0) (1.0 / ZOOM_STEP()) else ZOOM_STEP()
+        var gx: Rat = worldXOf(viewS, viewX, mousePosX())
+        var gy: Rat = worldYOf(viewS, viewY, mousePosY())
+        var ns: Rat = clampS((viewS * f), ZOOM_MIN(), ZOOM_MAX())
+        if (ns != viewS) {
+            viewX = zoomViewXAt(viewS, viewX, gx, ns)
+            viewY = zoomViewYAt(viewS, viewY, gy, ns)
+            viewX = panXOf(ns, viewX, 0.0)
+            viewY = panYOf(ns, viewY, 0.0)
+            viewS = ns
+            applyView(ns, viewX, viewY)
+        }
+    }
+    onMouseDown("left") { _e => if (!pressed) {
+        pressed = true
+        moved = false
+        pressX = mousePosX()
+        pressY = mousePosY()
+        lastX = pressX
+        lastY = pressY
+    } }
+    onMouseMove { _m => if (pressed) {
+        var mx: Rat = mousePosX()
+        var my: Rat = mousePosY()
+        var dx: Rat = distAbs(mx, pressX)
+        var dy3: Rat = distAbs(my, pressY)
+        if ((!moved) && ((dx > DRAG_THRESHOLD()) || (dy3 > DRAG_THRESHOLD()))) { moved = true }
+        if (moved) {
+            viewX = panXOf(viewS, viewX, (mx - lastX))
+            viewY = panYOf(viewS, viewY, (my - lastY))
+            applyView(viewS, viewX, viewY)
+        }
+        lastX = mx
+        lastY = my
+    } }
+    onMouseRelease("left") { _e => if (pressed) {
+        if (!moved) {
+            sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY))
+        }
+        pressed = false
+    } }
+    null
+}
+
+@impure
+fun main(): Null {
+    var lb: Bool = winWidth() >= winHeight()
+    gameStartFit(960, 540, lb, false)
+    sceneAdd("main") { _e => runSmoke() }
+    sceneGo("main")
+    null
+}
