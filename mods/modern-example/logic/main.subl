@@ -1,0 +1,8 @@
+// modern-example 模组逻辑占位（mods/<modid>/logic/*.subl 约定）
+//
+// 本体（foresight）是模组加载器：启动期扫描 mods/，把 mod.json/entities.json
+// 烘焙进 app/mods-data.subl（scripts/gen-mods.js）顶栏底栏即由其驱动。
+// 本目录的 .subl 是模组附着逻辑：构建期仅扫描进模组清单的 logic 字段，
+// 执行链路待 t84（Kotlin subs 解释器内置为 Sublimation 标准库）交付后接通——
+// 故此处只留纯函数占位，本体不会编译或执行它。
+fun modPlaceholder(): Str = "modern-example logic placeholder (runtime awaits t84 interpreter)"

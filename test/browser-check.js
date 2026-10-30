@@ -53,7 +53,7 @@ async function main() {
     "var gl = cv.getContext('webgl2') || cv.getContext('webgl'); if (!gl) return 'NO-GL';" +
     "function px(lx, ly) { var x = Math.round(lx * cv.width / 960), y = Math.round(ly * cv.height / 540);" +
     "  var p = new Uint8Array(4); gl.readPixels(x, cv.height - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p); return [p[0], p[1], p[2]]; }" +
-    "return JSON.stringify({ sea: px(200, 200), block2: px(620, 145), title: px(60, 14) }); })()";
+    "return JSON.stringify({ topbar: px(200, 10), bottombar: px(200, 520), sea: px(200, 300), block2: px(620, 145) }); })()";
   var probeRes = null;
   try { var r2 = await send('Runtime.evaluate', { expression: probe, returnByValue: true }); probeRes = r2 && r2.result && r2.result.value; }
   catch (e4) { probeRes = 'EVAL-ERR'; }

@@ -1,0 +1,27 @@
+{
+  "countries": [
+    { "id": "country.dongning", "name": "东宁民国" }
+  ],
+  "factions": [
+    { "id": "faction.industrial", "name": "实业派", "desc": "以实业路线影响政策解锁" },
+    { "id": "faction.military", "name": "军政派", "desc": "以军政路线影响政策解锁" }
+  ],
+  "ui": { "basic": "基本政策", "tree": "国家政策", "attrs": "国家属性", "blocks": "控制地块" },
+  "policiesBasic": [
+    { "id": "policy.trade", "name": "贸易立国", "desc": "开放通商口岸", "faction": "faction.industrial", "on": false },
+    { "id": "policy.education", "name": "国民教育", "desc": "推行基础教育", "faction": "", "on": false }
+  ],
+  "policiesTree": [
+    { "id": "policy.heavy_industry", "name": "重工业体系", "requires": "policy.trade", "faction": "faction.industrial" },
+    { "id": "policy.navy", "name": "近海海军", "requires": "policy.trade", "faction": "faction.military" }
+  ],
+  "attrs": [
+    { "id": "attr.stability", "name": "稳定度", "value": 50, "max": 100 },
+    { "id": "attr.treasury", "name": "国库", "value": 200, "max": 999 }
+  ],
+  "blocks": [
+    { "id": "block.harbor", "name": "北港", "owner": "country.dongning" },
+    { "id": "block.central", "name": "中原", "owner": "country.dongning" },
+    { "id": "block.oldcity", "name": "旧城", "owner": "country.dongning" }
+  ]
+}

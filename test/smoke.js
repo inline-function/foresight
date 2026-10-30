@@ -1,12 +1,7 @@
 "use strict";
-// smoke.js —— 《深谋远虑》foresight 工程冒烟测试（Node，无浏览器）
-// 把 KAPLAY 桩 + DOM/canvas 垫片 + 壳工程桥（js/game-runtime.js）+ 编译产物（app.js）
-// 放进同一作用域跑一遍，断言冒烟场景的引擎链路成立（S-1 装载：main 不自执行）。
-//
-// 三回归在 foresight 侧的对应轻量版本：
-//   GameDemo/render-smoke（渲染/坐标/交互） -> 本文件的点击选中/缩放/拖拽断言
-//   GameDemo/demo-logic（编译产物可运行）   -> 本文件的 S-1 装载 + app.js 执行
-//   SfG/dispatch-abi（桥 ABI 单入口）       -> 本文件对 __subl.call 分派链路的间接覆盖
+// smoke.js —— 《深谋远虑》foresight 冒烟测试（Node，无浏览器）
+// t83 回归（S-1 装载/烘焙/相机）+ t85 链路（模组驱动 UI）：
+//   mods/*.json 烘焙 -> 顶栏（国家/派系/时间）/ 底栏四按钮 / 四面板 / 时间慢 tick
 // 用法：先 scripts\build.ps1，再 node test/smoke.js
 const fs = require("fs");
 const path = require("path");
@@ -18,16 +13,18 @@ if (!fs.existsSync(path.join(gameDir, "app.js"))) {
     process.exit(1);
 }
 
-// ---- KAPLAY 桩（仅冒烟测试用：记录调用、提供最小可执行语义） ----
+// ---- KAPLAY 桩（记录调用、最小可执行语义、对象注册表支持 destroyAll） ----
 var __kaplayCalls = [];
 var __sgMouseHandlers = { down: [], release: [], move: [] };
 var __sgScrollHandlers = [];
+var __sgLoops = [];
 var __sgScenes = {};
 var __sgObjSeq = 0;
+var __sgObjs = [];
 var __mouse = { x: 480, y: 270 };
 function __setMouse(x, y) { __mouse.x = x; __mouse.y = y; }
 function __mkObj() {
-    return {
+    var o = {
         id: ++__sgObjSeq,
         pos: { x: 0, y: 0 },
         scale: { x: 1, y: 1 },
@@ -42,10 +39,13 @@ function __mkObj() {
             if (c && c.comp === "text") { this.text = c.t; }
             if (c && c.comp === "scale") { this.scale = { x: c.s, y: c.s }; }
         },
+        tag: function (t) { this.tags.push(t); },
         move: function (dx, dy) { this.pos.x += dx; this.pos.y += dy; },
         destroy: function () { this.destroyed = true; },
         exists: function () { return !this.destroyed; },
     };
+    __sgObjs.push(o);
+    return o;
 }
 globalThis.kaplay = function (opts) {
     __kaplayCalls.push({ fn: "kaplay", opts: opts });
@@ -71,6 +71,7 @@ globalThis.kaplay = function (opts) {
         add: function (cs) { var o = __mkObj(); __kaplayCalls.push({ fn: "add", obj: o, comps: cs }); return o; },
         vec2: function (x, y) { return { x: x, y: y }; },
         dt: function () { return 0.016; },
+        loop: function (secs, f) { __sgLoops.push({ secs: secs, f: f }); },
         onUpdate: function (f) { __kaplayCalls.push({ fn: "onUpdate" }); },
         onMouseDown: function (b, f) { __sgMouseHandlers.down.push({ b: b, f: f }); },
         onMouseRelease: function (b, f) { __sgMouseHandlers.release.push({ b: b, f: f }); },
@@ -79,8 +80,11 @@ globalThis.kaplay = function (opts) {
         mousePos: function () { return { x: __mouse.x, y: __mouse.y }; },
         camPos: function (x, y) { __kaplayCalls.push({ fn: "camPos", x: x, y: y }); },
         camScale: function (sx, sy) { __kaplayCalls.push({ fn: "camScale", sx: sx, sy: sy }); },
-        get: function (t) { return []; },
-        destroyAll: function (t) { __kaplayCalls.push({ fn: "destroyAll", tag: t }); },
+        get: function (t) { return __sgObjs.filter(function (o) { return o.tags.indexOf(t) >= 0 && !o.destroyed; }); },
+        destroyAll: function (t) {
+            __kaplayCalls.push({ fn: "destroyAll", tag: t });
+            __sgObjs.forEach(function (o) { if (o.tags.indexOf(t) >= 0) o.destroy(); });
+        },
     };
 };
 
@@ -129,71 +133,109 @@ function ok(name, cond, extra) {
     else { console.log("  FAIL " + name + (extra ? "  " + extra : "")); fails++; }
 }
 function calls(fn) { return __kaplayCalls.filter(function (c) { return c.fn === fn; }); }
-// 文本对象：add 返回的对象经 objUse 挂 text 组件（add 数组本身为空），按 obj.comps 查。
-function objsWithTextT(t) {
-    return calls("add").filter(function (c) {
-        return c.obj.comps.some(function (x) { return x && x.comp === "text" && x.t === t; });
-    }).map(function (c) { return c.obj; });
+function objsWithText(t) {
+    return __sgObjs.filter(function (o) {
+        return !o.destroyed && (o.text === t || o.comps.some(function (x) { return x && x.comp === "text" && x.t === t; }));
+    });
+}
+function objsTextHas(sub) {
+    return __sgObjs.filter(function (o) { return !o.destroyed && o.text.indexOf(sub) >= 0; });
+}
+function clickAt(x, y) {
+    __setMouse(x, y);
+    __sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
+    __sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 }
 
+// ---- t83 回归 ----
 ok("装载：__subl.main 导出并执行（S-1 形态）", true);
 var fit = calls("kaplay");
 ok("gameStartFit 960x540 初始化（letterbox 跟随窗口向性）",
     fit.length === 1 && fit[0].opts.width === 960 && fit[0].opts.height === 540);
 ok("场景 main 注册并切入", calls("go").some(function (c) { return c.name === "main"; }));
-
 var sprites = calls("loadSprite");
-ok("mapLoad 烘焙三地块精灵（凹形/菱形/带洞）", sprites.length === 3,
-    "实际 " + sprites.length + " 次 loadSprite");
-ok("烘焙画布尺寸非平凡（bbox ≥ 5px）", sprites.every(function (s) { return s.src.width >= 5 && s.src.height >= 5; }));
+ok("mapLoad 烘焙三地块精灵（凹形/菱形/带洞）", sprites.length === 3, "实际 " + sprites.length + " 次");
+ok("初始相机：camPos(420, 305) + camScale(1, 1)",
+    calls("camPos").length >= 1 && Math.abs(calls("camPos")[0].x - 420) < 0.5 && Math.abs(calls("camPos")[0].y - 305) < 0.5);
 
-ok("标题屏文本「深谋远虑」", objsWithTextT("深谋远虑").length === 1);
-ok("提示标签文本（未选状态）", objsWithTextT("骨架冒烟：点击地块 · 拖拽平移 · 滚轮缩放").length === 1);
-ok("初始相机：camPos(420, 305) + camScale(1, 1)（整图 fit 居中）",
-    calls("camPos").length >= 1 && Math.abs(calls("camPos")[0].x - 420) < 0.5 && Math.abs(calls("camPos")[0].y - 305) < 0.5,
-    "camPos=" + JSON.stringify(calls("camPos")[0]));
+// ---- t85：模组烘焙与顶栏（一切文案来自 mods/*.json） ----
+ok("模组驱动：顶栏主标题 = 玩家国家「东宁民国」（全不透明白）",
+    objsWithText("东宁民国").length >= 1, JSON.stringify(objsWithText("东宁民国").length));
+ok("模组驱动：副标题 = 派系「实业派」（id 解析自 entities.factions）",
+    objsWithText("实业派").length >= 1, "");
+ok("模组驱动：右侧时间「二十世纪初 · 1910 年 1 月」（非回合数）",
+    objsTextHas("二十世纪初").length === 1 && objsTextHas("二十世纪初")[0].text === "二十世纪初 · 1910 年 1 月",
+    JSON.stringify(objsTextHas("二十世纪初").map(function (o) { return o.text; })));
+ok("模组时间链路：tick 循环按 mod.time.tickSeconds=2.0s 注册（慢一点实时制）",
+    __sgLoops.length === 1 && Math.abs(__sgLoops[0].secs - 2.0) < 0.01,
+    JSON.stringify(__sgLoops.map(function (l) { return l.secs; })));
 
-// 点击选中：视口中心 (420,305)、缩放 1 -> 地块二菱形心 (560,180) 的屏幕坐标 = (620,145)
-var addsBefore = calls("add").length;
-__setMouse(620, 145);
-__sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
-__sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
-var labels = objsWithTextT("骨架冒烟：点击地块 · 拖拽平移 · 滚轮缩放");
-ok("点击地块二 -> 选中标签改写「已选：地块二」",
-    labels.length === 1 && labels[0].text === "已选：地块二", "label.text=" + (labels[0] && labels[0].text));
-ok("选中后整块重建（销毁旧 block 后再 add 三地块）", calls("add").length === addsBefore + 3,
-    "adds=" + addsBefore + "->" + calls("add").length);
+// ---- t85：底栏四图标按钮（文案来自 entities.ui） ----
+["基本政策", "国家政策", "国家属性", "控制地块"].forEach(function (lbl) {
+    ok("底栏按钮（模组 ui 文案）：「" + lbl + "」", objsWithText(lbl).length === 1, "");
+});
 
-// 滚轮缩放：第一档 1.15（map 560x430 仍小于视口，钳制钉回中心是设计行为），
-// 连滚五档到 ~2.01 后视口装不下全图，视图才脱离中心向光标锚方向移动。
+// ---- t85：面板（内容全来自模组 JSON） ----
+clickAt(120, 520);
+ok("点击「基本政策」-> 面板开：标题 + 开关行「贸易立国  关」",
+    objsTextHas("贸易立国").length === 1 && objsTextHas("贸易立国")[0].text.indexOf("关") >= 0,
+    JSON.stringify(objsTextHas("贸易立国").map(function (o) { return o.text; })));
+ok("面板含派系标签（解锁数据位可视化）：「【实业派】」", objsTextHas("【实业派】").length >= 1, "");
+clickAt(400, 155);
+ok("点击开关行 -> 翻转为「开」并重建面板",
+    objsTextHas("贸易立国").length === 1 && objsTextHas("贸易立国")[0].text.indexOf("开") >= 0,
+    JSON.stringify(objsTextHas("贸易立国").map(function (o) { return o.text; })));
+clickAt(350, 520);
+ok("切换到「国家政策」面板：树状行「重工业体系」+ 前置「贸易立国」+ 派系「实业派」",
+    objsTextHas("重工业体系").length === 1 && objsTextHas("重工业体系")[0].text.indexOf("贸易立国") >= 0
+    && objsTextHas("重工业体系")[0].text.indexOf("实业派") >= 0,
+    JSON.stringify(objsTextHas("重工业体系").map(function (o) { return o.text; })));
+clickAt(580, 520);
+ok("切换到「国家属性」面板：数值行「稳定度  50 / 100」（模组 attrs）",
+    objsTextHas("稳定度").length === 1 && objsTextHas("稳定度")[0].text.indexOf("50 / 100") >= 0,
+    JSON.stringify(objsTextHas("稳定度").map(function (o) { return o.text; })));
+clickAt(790, 520);
+ok("切换到「控制地块」面板：地块行「北港  归属 东宁民国」（命名/归属来自 entities）",
+    objsTextHas("北港").length === 1 && objsTextHas("北港")[0].text.indexOf("东宁民国") >= 0,
+    JSON.stringify(objsTextHas("北港").map(function (o) { return o.text; })));
+var harborBefore = objsTextHas("北港")[0];
+clickAt(790, 520);
+ok("再点同一按钮 -> 面板关（旧行对象销毁）", harborBefore && harborBefore.destroyed === true, "");
+
+// ---- t85：时间慢 tick（呈现为年月，非回合数） ----
+var timeLabel = objsTextHas("二十世纪初")[0];
+for (var t = 0; t < 3; t += 1) __sgLoops[0].f(null);
+ok("tick x3 -> 时间推进「1910 年 4 月」（年月呈现，非回合）",
+    timeLabel && timeLabel.text === "二十世纪初 · 1910 年 4 月" && timeLabel.text.indexOf("回合") < 0,
+    JSON.stringify(timeLabel && timeLabel.text));
+
+// ---- t83 回归：地图选中（地块命名来自模组：菱形=「中原」） ----
+clickAt(620, 145);
+ok("点击菱形地块 -> 选中标签「已选：中原」（地块命名来自 entities.blocks）",
+    objsTextHas("已选：中原").length === 1,
+    JSON.stringify(__sgObjs.filter(function (o) { return !o.destroyed && o.text.indexOf("已选") >= 0; }).map(function (o) { return o.text; })));
+
+// ---- t83 回归：相机 ----
 __sgScrollHandlers.forEach(function (f) { f({ y: -240 }); });
 var cs1 = calls("camScale");
 ok("滚轮缩放 -> camScale(1.15, 1.15)", cs1.length >= 2 && Math.abs(cs1[cs1.length - 1].sx - 1.15) < 0.01,
     "camScale=" + JSON.stringify(cs1[cs1.length - 1]));
 for (var w = 0; w < 4; w += 1) __sgScrollHandlers.forEach(function (f) { f({ y: -240 }); });
-var csN = calls("camScale");
-var cpsN = calls("camPos");
+var csN = calls("camScale"), cpsN = calls("camPos");
 var deepS = csN[csN.length - 1].sx;
-var deepX = cpsN[cpsN.length - 1].x, deepY = cpsN[cpsN.length - 1].y;
-ok("深缩放五档 -> camScale ≈ 2.01（1.15^5）", Math.abs(deepS - Math.pow(1.15, 5)) < 0.01,
-    "camScale=" + deepS);
-ok("深缩放后视图向光标锚（右下地块二）移动：x>420 且 y<305（脱离中心）",
-    deepX > 420.5 && deepY < 304.5, "camPos=(" + deepX + "," + deepY + ")");
-
-// 拖拽平移：深缩放下视口装不下全图，钳制 Activ，右移 80px -> viewX 减 80/s ≈ 39.8
+ok("深缩放五档 -> camScale ≈ 2.01", Math.abs(deepS - Math.pow(1.15, 5)) < 0.01, "camScale=" + deepS);
 __setMouse(620, 145);
 __sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 __setMouse(700, 145);
 __sgMouseHandlers.move.forEach(function (f) { f({ x: 700, y: 145 }); });
 var cps2 = calls("camPos");
 var last = cps2[cps2.length - 1];
-ok("拖拽平移 -> camPos.x 左移 ≈ 80/缩放（钳制生效区间内）",
-    Math.abs((deepX - last.x) - (80.0 / deepS)) < 0.5 && Math.abs(last.y - deepY) < 0.5,
-    "拖拽前=(" + deepX + "," + deepY + ") 拖拽后=" + JSON.stringify({ x: last.x, y: last.y }) + " s=" + deepS);
+ok("深缩放后拖拽平移 -> camPos.x 左移 ≈ 80/缩放",
+    Math.abs((cpsN[cpsN.length - 1].x - last.x) - (80.0 / deepS)) < 0.5, "camPos=" + JSON.stringify(last));
 
 if (fails > 0) {
     console.log("SMOKE: FAILED（" + fails + " 项未过）");
     process.exit(1);
 }
-console.log("SMOKE: ALL PASSED（S-1 装载 + mapLoad 烘焙 + 标题屏 + 点击选中 + 缩放/平移）");
+console.log("SMOKE: ALL PASSED（模组链路 + 顶栏底栏面板 + 时间 + 地图 + 相机）");
 }

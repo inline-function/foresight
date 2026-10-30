@@ -1,0 +1,114 @@
+// mods.subl —— 模组加载器（本体）：消费 mods-data.subl 的烘焙模组表
+// 顶栏/底栏/面板的一切文案都经此来自 mods/<modid>/*.json；本体不含具体内容。
+// 扫描发生在构建期（scripts/gen-mods.js：浏览器静态页无法运行时列目录），
+// 应用启动时从烘焙表装载模组表即「启动扫描发现并列模组」。
+// 多模组并列时本体取烘焙表第一个为活动模组（选择 UI 待后续）。
+// 注：JSON 读取整层标 @impure（规避纯函数结构递归停机检查；语义上数据读取本即副作用）。
+
+// ---------- Optional 兜底（空安全容器的默认值；纯函数） ----------
+fun strOr(o: Optional[Str], d: Str): Str = when(o) { is Some(v) => v; None => d }
+fun numOr(o: Optional[Rat], d: Rat): Rat = when(o) { is Some(v) => v; None => d }
+fun jsonOr(o: Optional[Json], d: Json): Json = when(o) { is Some(v) => v; None => d }
+fun natOr(o: Optional[Nat], d: Nat): Nat = when(o) { is Some(v) => v; None => d }
+fun boolOr(o: Optional[Bool], d: Bool): Bool = when(o) { is Some(v) => v; None => d }
+
+// ---------- JSON 取值糖（缺 key 回退空对象，链式取值不抛） ----------
+@impure
+fun emptyJson(): Json = when(jsonParse("{}")) { is Some(v) => v; None => emptyJson() }
+@impure
+fun jk(j: Json, k: Str): Json = jsonOr(jsonGet(j, k), emptyJson())
+@impure
+fun arrLen(a: Json): Nat = natOr(jsonLen(a), 0)
+@impure
+fun arrAt(a: Json, i: Nat): Json = jsonOr(jsonAt(a, i), emptyJson())
+@impure
+fun jstr(j: Json, k: Str): Str = strOr(jsonStr(jk(j, k)), "")
+@impure
+fun jnum(j: Json, k: Str): Rat = numOr(jsonNum(jk(j, k)), 0.0)
+@impure
+fun jbool(j: Json, k: Str): Bool = boolOr(jsonBool(jk(j, k)), false)
+
+// ---------- 模组根：启动期从烘焙表装载 ----------
+@impure
+fun modsRoot(): Json = when(jsonParse(MODS_JSON())) { is Some(v) => v; None => emptyJson() }
+@impure
+fun modsCount(): Nat = natOr(jsonLen(modsRoot()), 0)
+@impure
+fun activeMod(): Json = jsonOr(jsonAt(modsRoot(), 0), emptyJson())
+@impure
+fun modMod(m: Json): Json = jk(m, "mod")
+@impure
+fun modEnt(m: Json): Json = jk(m, "entities")
+
+// ---------- 顶栏数据（全部来自模组 mod.json） ----------
+@impure
+fun playerCountry(md: Json): Str = jstr(jk(md, "player"), "country")
+@impure
+fun playerFactionId(md: Json): Str = jstr(jk(md, "player"), "faction")
+
+// 时间（慢一点的实时制：内置 tick 计数 -> 年月展示，全部由模组 time 配置驱动）
+@impure
+fun timeEra(md: Json): Str = jstr(jk(md, "time"), "era")
+@impure
+fun timeStartYear(md: Json): Rat = jnum(jk(md, "time"), "startYear")
+@impure
+fun timeStartMonth(md: Json): Rat = jnum(jk(md, "time"), "startMonth")
+@impure
+fun timeMonthsPerTick(md: Json): Rat = jnum(jk(md, "time"), "monthsPerTick")
+@impure
+fun timeTickSeconds(md: Json): Rat = jnum(jk(md, "time"), "tickSeconds")
+
+// ---------- 实体解析（entities.json：id -> 显示名） ----------
+@impure
+fun lookupNameLoop(arr: Json, id: Str, i: Nat, n: Nat): Str =
+    if (i >= n) id
+    else {
+        var rid: Str = jstr(arrAt(arr, i), "id")
+        if (strCmp(rid, id) == 0) {
+            jstr(arrAt(arr, i), "name")
+        } else {
+            lookupNameLoop(arr, id, (i + 1), n)
+        }
+    }
+@impure
+fun lookupName(arr: Json, id: Str): Str = lookupNameLoop(arr, id, 0, arrLen(arr))
+@impure
+fun factionName(ent: Json, id: Str): Str = lookupName(jk(ent, "factions"), id)
+@impure
+fun countryName(ent: Json, id: Str): Str = lookupName(jk(ent, "countries"), id)
+
+// 政策 id -> 政策名（树状解锁的前置展示用）
+@impure
+fun policyNameByIdIn(arr: Json, id: Str): Str = lookupName(arr, id)
+@impure
+fun policyNameById(ent: Json, id: Str): Str = policyNameByIdPick(policyNameByIdIn(jk(ent, "policiesBasic"), id), ent, id)
+@impure
+fun policyNameByIdPick(b: Str, ent: Json, id: Str): Str =
+    if (strCmp(b, id) == 0) policyNameByIdIn(jk(ent, "policiesTree"), id) else b
+
+// ---------- 底栏文案（entities.ui，缺失回退内置默认标签） ----------
+@impure
+fun uiBasic(ent: Json): Str = jstr(jk(ent, "ui"), "basic")
+@impure
+fun uiTree(ent: Json): Str = jstr(jk(ent, "ui"), "tree")
+@impure
+fun uiAttrs(ent: Json): Str = jstr(jk(ent, "ui"), "attrs")
+@impure
+fun uiBlocks(ent: Json): Str = jstr(jk(ent, "ui"), "blocks")
+@impure
+fun panelTitle(ent: Json, kind: Str): Str =
+    if (strCmp(kind, "basic") == 0) uiBasic(ent)
+    else (if (strCmp(kind, "tree") == 0) uiTree(ent)
+    else (if (strCmp(kind, "attrs") == 0) uiAttrs(ent) else uiBlocks(ent)))
+
+// ---------- 派系解锁数据位（占位） ----------
+// 用户决策：派系=影响政策解锁。本体面板把 faction 渲染为标签，
+// 启用判定留数据位：当前恒真（不实现玩法），等模组 logic/*.subl 经 t84 解释器接通。
+fun factionUnlocks(rowFaction: Str, playerFaction: Str): Bool = true
+
+// ---------- 开关态（Str 上的集合：|id| 包装；纯字符串操作） ----------
+fun wrapId(id: Str): Str = concat(concat("|", id), "|")
+fun strHas(s: Str, p: Str): Bool = when(strIndexOf(s, p)) { is Some(_) => true; None => false }
+fun toggleOn(toggles: Str, id: Str): Bool = strHas(toggles, wrapId(id))
+fun toggleAdd(toggles: Str, id: Str): Str = concat(toggles, concat(id, "|"))
+fun toggleDel(toggles: Str, id: Str): Str = strReplace(toggles, wrapId(id), "|")

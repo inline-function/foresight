@@ -1,0 +1,129 @@
+// bottombar.subl —— 底栏 + 通用面板（fixed；一切文案来自模组 entities.ui/-实体表）
+// 四个图标按钮（文案 mod.ui 驱动，缺失回退默认标签）：基本政策（开关型）/ 国家政策（树状解锁）/ 国家属性（数值面板）/ 控制地块（地块列表）。
+// 面板内容全部由模组 JSON 驱动：本体只提供通用面板组件与数据绑定，不写具体政策/属性内容。
+// 派系=影响政策解锁：面板把 faction 渲染为标签，factionUnlocks 留数据位（mods.subl）。
+
+fun BBAR_Y(): Rat = 496.0
+fun BBAR_H(): Rat = 44.0
+fun BTN_Y(): Rat = 504.0
+fun BTN_H(): Rat = 32.0
+fun BTN_W(): Rat = 208.0
+fun BTN_DX(): Rat = 224.0
+fun BTN_N(): Nat = 4
+fun COL_BBAR(): Str = "#1B2430"
+fun COL_BTN(): Str = "#25313F"
+
+// 面板几何
+fun PN_X(): Rat = 280.0
+fun PN_Y(): Rat = 80.0
+fun PN_W(): Rat = 420.0
+fun PN_TITLE_H(): Rat = 44.0
+fun PN_BODY_H(): Rat = 320.0
+fun PN_ROW_Y0(): Rat = 140.0
+fun PN_ROW_DY(): Rat = 30.0
+fun PN_Z(): Rat = 20.0
+fun COL_PN_T(): Str = "#28394C"
+fun COL_PN_B(): Str = "#141C26"
+
+fun btnX(i: Nat): Rat = (16.0 + (toRat(i) * BTN_DX()))
+fun rowYOf(i: Nat): Rat = (PN_ROW_Y0() + (toRat(i) * PN_ROW_DY()))
+fun btnKind(i: Nat): Str =
+    if (i == 0) "basic"
+    else (if (i == 1) "tree"
+    else (if (i == 2) "attrs" else "blocks"))
+@impure
+fun btnLabel(ent: Json, i: Nat): Str =
+    if (i == 0) uiBasic(ent)
+    else (if (i == 1) uiTree(ent)
+    else (if (i == 2) uiAttrs(ent) else uiBlocks(ent)))
+
+// 屏幕坐标命中（fixed UI 所以就是鼠标坐标）
+fun btnHit(mx: Rat, my: Rat, i: Nat): Bool = ((mx >= btnX(i)) && (mx <= (btnX(i) + BTN_W()))) && ((my >= BTN_Y()) && (my <= (BTN_Y() + BTN_H())))
+@impure
+fun whichBtnLoop(mx: Rat, my: Rat, i: Nat): Nat =
+    if (i >= BTN_N()) BTN_N()
+    else (if (btnHit(mx, my, i)) i else whichBtnLoop(mx, my, (i + 1)))
+@impure
+fun whichBtn(mx: Rat, my: Rat): Nat = whichBtnLoop(mx, my, 0)
+
+// 底栏（标签文案来自模组 entities.ui；构建时面板初始为「未开」）
+@impure
+fun buildBottombar(m: Json): Null {
+    var ent: Json = modEnt(m)
+    var bar: Any = addRectT(960.0, BBAR_H(), 0.0, BBAR_Y(), COL_BBAR(), "ui", 10.0)
+    buildButtonsLoop(ent, 0)
+    null
+}
+@impure
+fun buildButtonsLoop(ent: Json, i: Nat): Null =
+    if (i >= BTN_N()) null
+    else {
+        var x: Rat = btnX(i)
+        var lbl: Str = btnLabel(ent, i)
+        var r: Any = addRectT(BTN_W(), BTN_H(), x, BTN_Y(), COL_BTN(), "ui", 11.0)
+        var t: Any = addTextT(lbl, (x + 60.0), (BTN_Y() + 9.0), 14.0, 400, COL_SUB(), "ui", true, 12.0)
+        buildButtonsLoop(ent, (i + 1))
+    }
+
+// ---------- 通用面板组件 ----------
+@impure
+fun renderPanel(m: Json, kind: Str, toggles: Str): Null {
+    var ent: Json = modEnt(m)
+    var title: Str = panelTitle(ent, kind)
+    var frame: Any = addRectT(PN_W(), PN_TITLE_H(), PN_X(), PN_Y(), COL_PN_T(), "panel", PN_Z())
+    var body: Any = addRectT(PN_W(), PN_BODY_H(), PN_X(), (PN_Y() + PN_TITLE_H()), COL_PN_B(), "panel", PN_Z())
+    var t: Any = addTextT(title, (PN_X() + 16.0), (PN_Y() + 11.0), 17.0, 700, COL_TITLE(), "panel", true, (PN_Z() + 1.0))
+    var rows: Nat = panelRowCount(ent, kind)
+    renderRowsLoop(m, kind, toggles, rows, 0)
+    null
+}
+@impure
+fun panelRowCount(ent: Json, kind: Str): Nat =
+    if (strCmp(kind, "basic") == 0) arrLen(jk(ent, "policiesBasic"))
+    else (if (strCmp(kind, "tree") == 0) arrLen(jk(ent, "policiesTree"))
+    else (if (strCmp(kind, "attrs") == 0) arrLen(jk(ent, "attrs")) else arrLen(jk(ent, "blocks"))))
+
+@impure
+fun renderRowsLoop(m: Json, kind: Str, toggles: Str, n: Nat, i: Nat): Null =
+    if (i >= n) null
+    else {
+        var ent: Json = modEnt(m)
+        var row: Str = panelRowText(ent, kind, toggles, i)
+        var o: Any = addTextT(row, (PN_X() + 16.0), rowYOf(i), 14.0, 400, COL_TITLE(), "panel", true, (PN_Z() + 1.0))
+        renderRowsLoop(m, kind, toggles, n, (i + 1))
+    }
+
+// 行文案：根据 kind 从模组实体表组装（派系标签 = 解锁数据位的可视化）
+@impure
+fun panelRowText(ent: Json, kind: Str, toggles: Str, i: Nat): Str =
+    if (strCmp(kind, "basic") == 0) basicRowText(ent, toggles, arrAt(jk(ent, "policiesBasic"), i))
+    else (if (strCmp(kind, "tree") == 0) treeRowText(ent, arrAt(jk(ent, "policiesTree"), i))
+    else (if (strCmp(kind, "attrs") == 0) attrRowText(arrAt(jk(ent, "attrs"), i))
+    else blockRowText(ent, arrAt(jk(ent, "blocks"), i))))
+
+@impure
+fun basicRowText(ent: Json, toggles: Str, row: Json): Str = concat(concat(concat(jstr(row, "name"), "  "), if (toggleOn(toggles, jstr(row, "id"))) "开" else "关"), basicFacTag(ent, jstr(row, "faction")))
+@impure
+fun basicFacTag(ent: Json, fid: Str): Str = if (strCmp(fid, "") == 0) "" else concat("  【", concat(factionName(ent, fid), "】"))
+@impure
+fun treeRowText(ent: Json, row: Json): Str = concat(concat(jstr(row, "name"), "  「前置："), concat(treeReqName(ent, jstr(row, "requires")), concat(" · 派系：", concat(treeFacName(ent, jstr(row, "faction")), "」"))))
+@impure
+fun treeReqName(ent: Json, req: Str): Str = if (strCmp(req, "") == 0) "无前置" else policyNameById(ent, req)
+@impure
+fun treeFacName(ent: Json, fid: Str): Str = if (strCmp(fid, "") == 0) "无派系" else factionName(ent, fid)
+@impure
+fun attrRowText(row: Json): Str = concat(concat(concat(jstr(row, "name"), "  "), toStr(jnum(row, "value"))), concat(" / ", toStr(jnum(row, "max"))))
+@impure
+fun blockRowText(ent: Json, row: Json): Str = concat(concat(jstr(row, "name"), "  归属 "), countryName(ent, jstr(row, "owner")))
+
+// 开关行点击：命中行 -> 翻转该基本政策开关态（数据位见 mods.subl）
+@impure
+fun panelRowHit(my: Rat, i: Nat, n: Nat): Nat =
+    if (i >= n) n
+    else (if ((my >= rowYOf(i)) && (my < (rowYOf(i) + PN_ROW_DY()))) i else panelRowHit(my, (i + 1), n))
+@impure
+fun flipToggleRow(ent: Json, toggles: Str, i: Nat): Str = flipToggleRowOf(jstr(arrAt(jk(ent, "policiesBasic"), i), "id"), toggles)
+@impure
+fun flipToggleRowOf(pid: Str, toggles: Str): Str =
+    if (strCmp(pid, "") == 0) toggles
+    else (if (toggleOn(toggles, pid)) toggleDel(toggles, pid) else toggleAdd(toggles, pid))

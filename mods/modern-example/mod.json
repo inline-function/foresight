@@ -1,0 +1,8 @@
+{
+  "id": "modern-example",
+  "name": "近现代示例",
+  "version": 1,
+  "deps": [],
+  "player": { "country": "东宁民国", "faction": "faction.industrial" },
+  "time": { "era": "二十世纪初", "startYear": 1910, "startMonth": 1, "monthsPerTick": 1, "tickSeconds": 2.0 }
+}

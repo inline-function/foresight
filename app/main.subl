@@ -1,10 +1,11 @@
-// main.subl —— 《深谋远虑》工程骨架冒烟场景（无剧情玩法）
-// 引擎链路验证（GameDemo 东亚地图技术验证的极简版）：
-//   mapLoad 烘焙硬边精灵（扫描线填充 + Bresenham 描边）
-//   -> mapProvObj 渲染期 compColorHex tint
-//   -> mapHitProv 射线法命中（凹多边形/多环）
+// main.subl —— 《深谋远虑》主控（foresight = 模组加载器：本体不做内容）
+// 场景链路（t83 骨架 + t85 顶栏底栏/模组数据）：
+//   mods 烘焙表（mods-data.subl，scripts/gen-mods.js 扫描 mods/ 生成）
+//   -> entities.blocks 命名/归属驱动地图三地块（mapLoad 烘焙硬边精灵）
+//   -> 顶栏（topbar.subl：国家主标题/派系副标题/慢实时制时间，全模组驱动）
+//   -> 底栏（bottombar.subl：四面板按钮 + 通用面板，行内容全模组驱动）
 //   -> 相机缩放（滚轮锚定光标）/ 平移（拖拽钳制）/ 点击选中。
-// 地块数据见 smoke-data.subl（三地块：凹形/菱形/带洞，各验一项能力）。
+// t84 解释器交付前，模组 logic/*.subl 只扫描进清单不执行（mods/README.md）。
 
 // ---------- 画布与布局 ----------
 fun VIEW_W(): Rat = 960.0
@@ -55,25 +56,58 @@ fun zoomViewYAt(viewS: Rat, viewY: Rat, wa: Rat, ns: Rat): Rat = (wa - ((screenY
 fun panXOf(viewS: Rat, viewX: Rat, dx: Rat): Rat = clampP((viewX - (dx / viewS)), panMinX(viewS), panMaxX(viewS))
 fun panYOf(viewS: Rat, viewY: Rat, dy: Rat): Rat = clampP((viewY - (dy / viewS)), panMinY(viewS), panMaxY(viewS))
 
-// ---------- 文案 ----------
-fun titleText(): Str = "深谋远虑"
-fun hintLabel(): Str = "骨架冒烟：点击地块 · 拖拽平移 · 滚轮缩放"
-fun selLabel(name: Str): Str = concat("已选：", name)
-
-// ---------- 渲染 ----------
-// 带颜色的文本对象（fixed + z=10 钉在顶栏层）。
+// ---------- 通用 UI 组件（fixed 屏幕坐标 + z 分层；顶栏 10 / 底栏 10-12 / 面板 20） ----------
 @impure
-fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, hex: Str, tag: Str, fixed: Bool): Any {
+fun addRectT(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat): Any {
     unchecked var o = objAdd()
     unchecked objUse(o, compPos(x, y))
-    unchecked objUse(o, compText(t, size, 400))
+    unchecked objUse(o, compRect(w, h))
     unchecked objUse(o, compColorHex(hex))
-    unchecked if (fixed) { objUse(o, compFixed()); objUse(o, compZ(10.0)) }
+    unchecked objUse(o, compFixed())
+    unchecked objUse(o, compZ(z))
+    unchecked objTag(o, tag)
+    return o
+}
+@impure
+fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, hex: Str, tag: Str, fixed: Bool, z: Rat): Any {
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(x, y))
+    unchecked objUse(o, compText(t, size, w))
+    unchecked objUse(o, compColorHex(hex))
+    unchecked if (fixed) { objUse(o, compFixed()); objUse(o, compZ(z)) }
     unchecked objTag(o, tag)
     return o
 }
 
-// 地块渲染：按地块色 tint；选中换金。整块重建（骨架阶段地块少，直接全建）。
+// ---------- 地图表：地块命名/归属来自模组 entities.blocks，几何来自 smoke-data ----------
+@impure
+fun blockCount(ent: Json): Nat = arrLen(jk(ent, "blocks"))
+@impure
+fun mapRowsLoop(ent: Json, n: Nat, i: Nat, acc: Str): Str =
+    if (i >= n) acc
+    else {
+        var nm: Str = jstr(arrAt(jk(ent, "blocks"), i), "name")
+        var row: Str = concat(concat(nm, ":"), geomOf(i))
+        var sep: Str = if (i == 0) "" else "|"
+        mapRowsLoop(ent, n, (i + 1), concat(concat(acc, sep), row))
+    }
+@impure
+fun mapTableOf(ent: Json): Str = mapRowsLoop(ent, blockCount(ent), 0, "")
+
+// ---------- 基本政策初始开关态（来自模组 policiesBasic.on） ----------
+@impure
+fun initTogglesLoop(ent: Json, n: Nat, i: Nat, acc: Str): Str =
+    if (i >= n) acc
+    else {
+        var row: Json = arrAt(jk(ent, "policiesBasic"), i)
+        var pid: Str = jstr(row, "id")
+        var on: Bool = jbool(row, "on")
+        initTogglesLoop(ent, n, (i + 1), if (on) concat(acc, concat(pid, "|")) else acc)
+    }
+@impure
+fun initToggles(ent: Json): Str = initTogglesLoop(ent, arrLen(jk(ent, "policiesBasic")), 0, "|")
+
+// ---------- 渲染 ----------
 @impure
 fun renderBlocksLoop(geo: Any, n: Nat, i: Nat, sel: Int): Null =
     if (i >= n) null
@@ -87,7 +121,6 @@ fun renderBlocksLoop(geo: Any, n: Nat, i: Nat, sel: Int): Null =
 @impure
 fun renderBlocks(geo: Any, n: Nat, sel: Int): Null = renderBlocksLoop(geo, n, 0, sel)
 
-// 相机只改 camPos/camScale（渲染期变换），不重建地块。
 @impure
 fun applyView(viewS: Rat, viewX: Rat, viewY: Rat): Null {
     camPos(viewX, viewY)
@@ -95,7 +128,6 @@ fun applyView(viewS: Rat, viewX: Rat, viewY: Rat): Null {
     null
 }
 
-// 点击选中：命中地块 -> 换金 + 更新标签（未命中保持原选中）。
 @impure
 fun selectAt(geo: Any, n: Nat, label: Any, sel: Int, wx: Rat, wy: Rat): Int {
     var hit: Int = mapHitProv(geo, wx, wy)
@@ -105,29 +137,33 @@ fun selectAt(geo: Any, n: Nat, label: Any, sel: Int, wx: Rat, wy: Rat): Int {
             objsDestroyTag("block")
             r = hit
             renderBlocks(geo, n, hit)
-            objTextSet(label, selLabel(mapProvName(geo, hit)))
+            objTextSet(label, concat("已选：", mapProvName(geo, hit)))
         }
     }
     return r
 }
 
+// ---------- 主场景 ----------
 @impure
 fun runSmoke(): Null {
-    var geo: Any = mapLoad(MAP_T())
+    var m: Json = activeMod()
+    var md: Json = modMod(m)
+    var ent: Json = modEnt(m)
+    var geo: Any = mapLoad(mapTableOf(ent))
     var n: Nat = mapProvCount(geo)
     // 海面背景：扩到地块包围盒 + PAD。
     var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_BG())
     objTag(bg, "ui")
-    // 顶栏：fixed + z=10 固定屏幕坐标，盖在地块之上。
-    var tbar: Any = objAdd()
-    unchecked objUse(tbar, compRect(VIEW_W(), TITLE_H()))
-    unchecked objUse(tbar, compPos(0.0, 0.0))
-    unchecked objUse(tbar, compColorHex(COL_BG()))
-    unchecked objUse(tbar, compFixed())
-    unchecked objUse(tbar, compZ(10.0))
-    unchecked objTag(tbar, "ui")
-    var title: Any = addTextT(titleText(), 14.0, 8.0, 18.0, COL_TITLE(), "ui", true)
-    var label: Any = addTextT(hintLabel(), 230.0, 13.0, 15.0, COL_SUB(), "ui", true)
+    // 顶栏（含时间标签）/ 选中提示 / 底栏（四面板按钮）
+    var tl: Any = buildTopbar(m)
+    var label: Any = addTextT("", LABEL_X(), 13.0, 15.0, 400, COL_SUB(), "ui", true, 11.0)
+    buildBottombar(m)
+    @mut var toggles: Str = initToggles(ent)
+    @mut var panel: Str = "none"
+    @mut var year: Rat = timeStartYear(md)
+    @mut var month: Rat = timeStartMonth(md)
+    var tickSec: Rat = timeTickSeconds(md)
+    var mpTick: Rat = timeMonthsPerTick(md)
     @mut var sel: Int = -1
     @mut var viewS: Rat = 1.0
     @mut var viewX: Rat = INIT_X()
@@ -140,6 +176,13 @@ fun runSmoke(): Null {
     @mut var moved: Bool = false
     renderBlocks(geo, n, -1)
     applyView(viewS, viewX, viewY)
+    // 时间：内置 tick 计数 -> 呈现为模组驱动的年月（慢一点的实时制；非回合数）
+    every(tickSec) { _e =>
+        month = (month + mpTick)
+        year = timeNextYear(year, month)
+        month = timeNextMonth(month)
+        objTextSet(tl, timeLabelText(md, year, month))
+    }
     onScroll { dy =>
         var f: Rat = if (dy > 0.0) (1.0 / ZOOM_STEP()) else ZOOM_STEP()
         var gx: Rat = worldXOf(viewS, viewX, mousePosX())
@@ -178,7 +221,32 @@ fun runSmoke(): Null {
     } }
     onMouseRelease("left") { _e => if (pressed) {
         if (!moved) {
-            sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY))
+            var b: Nat = whichBtn(pressX, pressY)
+            if (b < BTN_N()) {
+                var kind: Str = btnKind(b)
+                if (strCmp(kind, panel) == 0) {
+                    objsDestroyTag("panel")
+                    panel = "none"
+                } else {
+                    objsDestroyTag("panel")
+                    renderPanel(m, kind, toggles)
+                    panel = kind
+                }
+            } else {
+                if (strCmp(panel, "basic") == 0) {
+                    var rows: Nat = panelRowCount(ent, "basic")
+                    var ri: Nat = panelRowHit(pressY, 0, rows)
+                    if (ri < rows) {
+                        toggles = flipToggleRow(ent, toggles, ri)
+                        objsDestroyTag("panel")
+                        renderPanel(m, "basic", toggles)
+                    }
+                } else {
+                    if (strCmp(panel, "none") == 0) {
+                        sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY))
+                    }
+                }
+            }
         }
         pressed = false
     } }

@@ -1,0 +1,35 @@
+// topbar.subl —— 顶栏（fixed + z=10，沿用地图线已验证的顶栏方案）
+// 主标题 = 玩家国家名（全不透明，模组 mod.json.player.country）
+// 副标题 = 派系名（弱透明约 0.5：桥暂无 opacity 通道，以降色 COL_SUB 实现等观感）
+// 右侧 = 时间：内置 tick 计数但呈现为「慢一点的实时制」年月（era+起始年月+每推进月数+tick 秒数全由模组 time 配置驱动；非回合数）
+// 一切文案经 mods.subl 来自模组 JSON；本体不含具体内容。
+
+fun TBAR_H(): Rat = 36.0
+fun TIME_X(): Rat = 700.0
+fun SUB_X(): Rat = 170.0
+fun LABEL_X(): Rat = 430.0
+fun COL_TBAR(): Str = "#1B2430"
+fun TBAR_W(): Rat = 960.0
+
+// 时间展示串：era + " · " + 年月（年月数字来自 tick 状态，era 来自模组）
+fun dateText(y: Rat, mo: Rat): Str = concat(concat(concat(toStr(y), " 年 "), toStr(mo)), " 月")
+@impure
+fun timeLabelText(md: Json, y: Rat, mo: Rat): Str = concat(concat(timeEra(md), " · "), dateText(y, mo))
+fun timeNextYear(y: Rat, mo: Rat): Rat = (y + floor(((mo - 1.0) / 12.0)))
+fun timeNextMonth(mo: Rat): Rat = (((mo - 1.0) - (floor(((mo - 1.0) / 12.0)) * 12.0)) + 1.0)
+
+// 顶栏：返回时间标签对象（tick 时由 main 更新它）。
+@impure
+fun buildTopbar(m: Json): Any {
+    var md: Json = modMod(m)
+    var ent: Json = modEnt(m)
+    var bar: Any = addRectT(TBAR_W(), TBAR_H(), 0.0, 0.0, COL_TBAR(), "ui", 10.0)
+    var country: Str = playerCountry(md)
+    var facName: Str = factionName(ent, playerFactionId(md))
+    var t: Any = addTextT(country, 14.0, 8.0, 18.0, 700, COL_TITLE(), "ui", true, 11.0)
+    var s: Any = addTextT(facName, SUB_X(), 13.0, 15.0, 400, COL_SUB(), "ui", true, 11.0)
+    var y0: Rat = timeStartYear(md)
+    var mo0: Rat = timeStartMonth(md)
+    var tl: Any = addTextT(timeLabelText(md, y0, mo0), TIME_X(), 8.0, 16.0, 400, COL_SUB(), "ui", true, 11.0)
+    return tl
+}

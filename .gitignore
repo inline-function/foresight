@@ -8,3 +8,6 @@ test/browser-screenshot.png
 # 编辑器/系统杂物
 .DS_Store
 *.swp
+
+# generated mod data table
+app/mods-data.subl
