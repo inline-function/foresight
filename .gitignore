@@ -11,3 +11,8 @@ test/browser-screenshot.png
 
 # generated mod data table
 app/mods-data.subl
+
+# CDP 像素取证产物（test/cdp-shots.js 生成）
+test/shot-*.png
+test/hist*.py
+test/prof-*/

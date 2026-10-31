@@ -1,6 +1,6 @@
 // views.subl —— 叙事演出层（t89：1920x1080 MD3 Dialog/Card 风格）
 // 事件卡 = MD3 对话框（scrim + 圆角表面 + 标题/内容 + MD3 按钮选项）；
-// 沉浸式/超事件 = MD3 全屏对话框（黑底逐行保留）。
+// 沉浸式 = 三要素（默认背景图 + 人物名 + 对话内容，无名=旁白）；超事件 = 黑底逐行。
 // 三种层的内容全部来自模组 entities.events，本体只提供几何与缺图占位渲染。
 // tag="view"（z 26-100）：事件层高于全屏界面(30)，超事件全屏高于一切。
 @impure
@@ -61,28 +61,47 @@ fun cardRowHitLoop(y: Rat, dy: Rat, my: Rat, i: Nat, n: Nat): Nat =
 fun cardRowHit(my: Rat, n: Nat): Nat = cardRowHitLoop(CC_OPT_Y0(), CC_OPT_DY(), my, 0, n)
 
 // ---------- 沉浸式：MD3 全屏对话框（背景/立绘占位 + 逐行对话） ----------
+// ---------- 沉浸式（三要素）：背景图（默认占位）+ 人物名（旁白无）+ 对话内容 ----------
+// 布局：全屏默认背景（无美术资源时的统一底图）+ 底部 VN 式对话框 + 框上人物名牌；
+// 人物名为空（None/缺省）= 旁白，不画名牌，对话内容直接呈现在框内。
+fun IM_BG0(): Str = "#14181C"
+fun IM_BG1(): Str = "#1B2026"
+fun IM_SCENE_Y(): Rat = 56.0
+fun IM_SCENE_H(): Rat = 880.0
+fun IM_DLG_Y(): Rat = 768.0
+fun IM_DLG_H(): Rat = 232.0
+fun IM_NAME_Y(): Rat = 688.0
+fun IM_NAME_H(): Rat = 64.0
+fun IM_PAD(): Rat = 80.0
 @impure
 fun renderImmersive(m: Json, ev: Json, step: Nat): Null {
-    var dim: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_DIM(), "view", 26.0)
-    // 背景占位框（资产缺失：字段空 -> 缺图框；有路径 -> 缺图框+名，均不加载资源文件）
-    var bo: Any = addRectT(1400.0, 600.0, 260.0, 116.0, COL_FRAME(), "view", 28.0)
-    var bi: Any = addRectT(1376.0, 576.0, 272.0, 128.0, COL_INNER(), "view", 29.0)
-    var bgt: Any = addTextT(imgPlaceholder(jstr(ev, "bg"), "背景"), 320.0, 392.0, 28.0, 400, COL_SOFT(), "view", true, 30.0)
-    // 立绘占位框
-    var po: Any = addRectT(320.0, 520.0, 800.0, 156.0, COL_FRAME(), "view", 29.0)
-    var pi: Any = addRectT(296.0, 496.0, 812.0, 168.0, COL_INNER(), "view", 30.0)
-    var prt: Any = addTextT(imgPlaceholder(jstr(ev, "portrait"), "立绘"), 832.0, 392.0, 26.0, 400, COL_SOFT(), "view", true, 31.0)
-    // 标题
-    var tt: Any = addTextT(jstr(ev, "title"), 280.0, 760.0, 30.0, 700, COL_SOFT(), "view", true, 28.0)
-    // 对话框：逐行（step 推进）
-    var db: Any = addRoundRect(1600.0, 168.0, 160.0, 792.0, COL_CARD(), "view", 28.0, 28.0)
-    var lt: Any = addTextT(lineTextOf(jk(ev, "lines"), step), 208.0, 852.0, 32.0, 400, COL_SOFT(), "view", true, 30.0)
-    var ht: Any = addTextT(lineHint(step, arrLen(jk(ev, "lines"))), 208.0, 928.0, 24.0, 400, COL_SOFT(), "view", true, 30.0)
+    var linesJ: Json = jk(ev, "lines")
+    var line: Json = arrAt(linesJ, step)
+    var nm: Str = lineNameOf(line)
+    var tx: Str = lineTextOf1(line)
+    // 1) 背景图：默认背景（资源管线未通前统一底图：深色场景面 + 顶部场景小标）
+    var b0: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, IM_BG0(), "view", 26.0)
+    var b1: Any = addRoundRect(1760.0, IM_SCENE_H(), IM_PAD(), IM_SCENE_Y(), IM_BG1(), "view", 27.0, 32.0)
+    var st: Any = addTextT(jstr(ev, "title"), (IM_PAD() + 48.0), (IM_SCENE_Y() + 32.0), 24.0, 400, "#8B939C", "view", true, 27.0)
+    // 2) 对话内容：底部 VN 式对话框（逐行 step 推进）
+    var db: Any = addRoundRect(1760.0, IM_DLG_H(), IM_PAD(), IM_DLG_Y(), COL_CARD(), "view", 28.0, 28.0)
+    var lt: Any = addTextWrap(tx, (IM_PAD() + 64.0), (IM_DLG_Y() + 44.0), 34.0, 400, 1632.0, COL_SOFT(), "view", true, 30.0)
+    var ht: Any = addTextT(lineHint(step, arrLen(linesJ)), (IM_PAD() + 64.0), (IM_DLG_Y() + 160.0), 22.0, 400, "#8B939C", "view", true, 30.0)
+    // 3) 人物名：非空才画（MD3 名牌）
+    if (strCmp(nm, "") != 0) {
+        var nb: Any = addRoundRect(336.0, IM_NAME_H(), IM_PAD(), IM_NAME_Y(), "#A6C8FF", "view", 28.0, 20.0)
+        var nt: Any = addTextT(nm, (IM_PAD() + 32.0), (IM_NAME_Y() + 14.0), 30.0, 700, "#05243F", "view", true, 32.0)
+    } else null
     null
 }
-fun imgPlaceholder(path: Str, kind: Str): Str =
-    if (strCmp(path, "") == 0) concat(concat("【缺图·", kind), "】")
-    else concat(concat(concat("【缺图·", kind), "】"), path)
+// 行解析：对象行 {name, text}（name 缺省/空 = 旁白）；纯文本旧行兜底（无名字）
+@impure
+fun lineNameOf(line: Json): Str = jstr(line, "name")
+@impure
+fun lineTextOf(lines: Json, i: Nat): Str = lineTextOf1(arrAt(lines, i))
+@impure
+fun lineTextOf1(line: Json): Str = if (strCmp(jstr(line, "text"), "") != 0) jstr(line, "text") else strOr(jsonStr(line), "")
+@impure
 fun lineHint(step: Nat, cnt: Nat): Str =
     if (step + 1 >= cnt) "点击结束" else "点击继续"
 
@@ -105,7 +124,3 @@ fun renderChEnd(m: Json, lines: Json, step: Nat): Null {
     var ht: Any = addTextT(lineHint(step, arrLen(lines)), 280.0, 600.0, 26.0, 400, COL_SOFT(), "view", true, 100.0)
     null
 }
-
-// ---------- 逐行文本取值（越界兜底空串） ----------
-@impure
-fun lineTextOf(lines: Json, i: Nat): Str = strOr(jsonStr(arrAt(lines, i)), "")

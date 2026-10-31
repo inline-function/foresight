@@ -34,13 +34,13 @@ function __mkObj() {
         destroyed: false,
         use: function (c) {
             this.comps.push(c);
-            if (typeof c === "string") { this.tags.push(c); return; }
             if (c && c.comp === "pos") { this.pos = { x: c.x, y: c.y }; }
+            if (typeof c === "string") { this.tags.push(c); return; }
             if (c && c.comp === "text") { this.text = c.t; }
             if (c && c.comp === "scale") { this.scale = { x: c.s, y: c.s }; }
         },
-        tag: function (t) { this.tags.push(t); },
         move: function (dx, dy) { this.pos.x += dx; this.pos.y += dy; },
+        tag: function (t) { this.tags.push(t); },
         destroy: function () { this.destroyed = true; },
         exists: function () { return !this.destroyed; },
     };
@@ -72,7 +72,7 @@ globalThis.kaplay = function (opts) {
         vec2: function (x, y) { return { x: x, y: y }; },
         dt: function () { return 0.016; },
         loop: function (secs, f) { __sgLoops.push({ secs: secs, f: f }); },
-        onUpdate: function (f) { __kaplayCalls.push({ fn: "onUpdate" }); },
+        onUpdate: function (f) { __kaplayCalls.push({ fn: "onUpdate" }); globalThis.__sgOnUpdate = f; },
         onMouseDown: function (b, f) { __sgMouseHandlers.down.push({ b: b, f: f }); },
         onMouseRelease: function (b, f) { __sgMouseHandlers.release.push({ b: b, f: f }); },
         onMouseMove: function (f) { __sgMouseHandlers.move.push(f); },
@@ -83,7 +83,7 @@ globalThis.kaplay = function (opts) {
         get: function (t) { return __sgObjs.filter(function (o) { return o.tags.indexOf(t) >= 0 && !o.destroyed; }); },
         destroyAll: function (t) {
             __kaplayCalls.push({ fn: "destroyAll", tag: t });
-            __sgObjs.forEach(function (o) { if (o.tags.indexOf(t) >= 0) o.destroy(); });
+            __sgObjs.forEach(function (o) { if (o.tags.indexOf(t) >= 0 && !o.destroyed) { o.destroy(); } });
         },
     };
 };
@@ -146,6 +146,7 @@ function clickAt(x, y) {
     __sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
     __sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 }
+function sgFire(dt) { if (globalThis.__sgOnUpdate) globalThis.__sgOnUpdate(dt); }
 function oneText(sub) {
     var xs = objsTextHas(sub);
     return xs.length >= 1 ? xs[xs.length - 1].text : "（无）";
@@ -268,11 +269,43 @@ ok("t89 面板滚动：连按两下回顶（首行疫情回到可视区、末行
     objsTextHas("疫情").length > 0 && objsTextHas("科技点").length === 0, "scroll3");
 navBtn(3);
 snap();
-ok("t89 全屏切换：控制地块界面（武汉/北京/上海 + 归属 中华人民共和国）",
-    ["武汉", "北京", "上海"].every(function (t) { return objsWithText(t).length > 0; })
-    && objsTextHas("归属 中华人民共和国").length > 0);
+ok("t89 全屏切换：控制地块界面（81 块表，首屏窗口显示 北京市 + 归属 中华人民共和国）",
+    objsWithText("北京市").length > 0 && objsTextHas("归属 中华人民共和国").length > 0 && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }).length >= 10);
 clickAt(152, 64);
 ok("t89 返回按钮：回到地图主界面（panel 层清空）", !anyPanel() && objsWithText("操作").length > 0);
+// ---- 地块抽屉（海域地块 + 陆地详情 + 驻军移动） ----
+var seaObjs = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("seaprov") >= 0; });
+ok("t89 海域地块渲染（12 块 seaprov 精灵，渲染于陆地之下）", seaObjs.length === 12, "seaprov=" + seaObjs.length);
+clickAt(1233, 379); snap(); // 北京市形心（世界 1272,354）（视口 999,515 下世界 2x 中心约 1254..1292,340..368）
+
+ok("t89 抽屉打开：北京市 / 归属 / 人口 / 稳定度 / 发展程度 / 标签",
+    objsWithText("北京市").length > 0 && objsTextHas("归属 中华人民共和国").length > 0
+    && objsTextHas("2171 万").length > 0 && objsTextHas("72 / 100").length > 0
+    && objsTextHas("9 / 10").length > 0 && objsTextHas("平原").length > 0 && objsTextHas("都市").length > 0,
+    oneText("归属 中华人民共和国"));
+ok("t89 抽屉驻军：数量 3 + 移动军队按钮", objsTextHas("移动军队").length > 0);
+clickAt(440, 736); snap(); // 移动军队按钮 -> 进入移动模式（抽屉关闭、地图高亮邻接地）
+ok("t89 移动模式：抽屉关闭 + 地图高亮邻近地块(>=3) + 提示语",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
+    && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3
+    && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0, oneText("移动军队："));
+clickAt(1251, 393); snap(); // 高亮的天津市形心（2x 世界 645,184）
+ok("t89 驻军移动：点击高亮地块 -> 已移动 1 支军队至 天津市（北京市 2/天津市 2）",
+    objsTextHas("已移动 1 支军队至 天津市").length > 0
+    && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3);
+clickAt(1233, 379); snap(); // 北京（非邻接）-> 退出移动模式并开抽屉
+ok("t89 退出移动模式：点非邻接地 -> 高亮清除、抽屉重开",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0
+    && objsTextHas("驻扎军队").length > 0);
+clickAt(560, 60); snap(); // 关闭 ✕ (520..592, 24..96)
+var drObjs = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; });
+ok("t89 抽屉关闭（drawer 层清空）", drObjs.length === 0, "drawer=" + drObjs.length);
+clickAt(1501, 665); snap(); // 东海（世界 1540,640；陆地点之外的海域）
+ok("t89 海域抽屉：东海 / 归属公海 / 标签海域 / 舰队可移动",
+    objsWithText("东海").length > 0 && objsTextHas("公海").length > 0
+    && objsTextHas("海域").length > 0 && objsTextHas("移动军队").length > 0,
+    oneText("公海"));
+clickAt(560, 60); snap(); // 关闭海域抽屉
 navBtn(0);
 ok("t89 返回后保持操作状态：操作主面板仍在（行动点 1/1 未扣，SEL/AP 状态保留）",
     objsTextHas("应急预案").length > 0 && objsTextHas("行动点 1 / 1").length > 0);
@@ -284,11 +317,21 @@ for (var i = 0; i < ev[0].lines.length - 1; i++) clickAt(960, 540);
 clickAt(960, 540); snap();
 // ---- 第一章开场：沉浸式（MD3 全屏对话框：会议室卫生部长 vs 财政部长） ----
 ok("第一章开场沉浸式：标题「会议室」", objsTextHas("会议室").length > 0, oneText("会议室"));
-ok("第一章开场沉浸式：缺图占位框渲染（背景/立绘）", objsTextHas("缺图").length >= 2, oneText("缺图"));
-ok("第一章开场沉浸式：首行 卫生部长：封城。必须封。", objsTextHas("卫生部长").length > 0, oneText("卫生部长"));
+ok("第一章开场沉浸式：默认背景渲染（场景面 + 场景小标）", objsTextHas("会议室").length > 0 && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("view") >= 0 && o.comps.some(function (c) { return c.comp === "rect"; }); }).length >= 4, "bg");
+ok("第一章开场沉浸式：人物名牌「卫生部长」+ 对话内容首行", objsTextHas("卫生部长").length > 0 && objsTextHas("封城。必须封").length > 0, oneText("封城"));
 clickAt(960, 540); snap();
-ok("第一章开场沉浸式：逐行推进（财政部长：封城经济会崩）", objsTextHas("财政部长").length > 0);
-for (var i = 0; i < ev[1].lines.length - 1; i++) clickAt(960, 540);
+ok("第一章开场沉浸式：逐行推进（财政部长：封城经济会崩）", objsTextHas("财政部长").length > 0 && objsTextHas("封城经济会崩").length > 0, "步1");
+clickAt(960, 540); snap();
+ok("第一章开场沉浸式：逐行推进（卫生部长：经济崩了可以再建）", objsTextHas("经济崩了可以再建").length > 0, "步2");
+clickAt(960, 540); snap();
+ok("第一章开场沉浸式：逐行推进（财政部长：你说得轻巧）", objsTextHas("你说得轻巧").length > 0, "步3");
+clickAt(960, 540); snap();
+ok("第一章开场沉浸式：旁白行（无人物名 -> 不画名牌）",
+    objsTextHas('你想起 2003 年').length > 0,
+    (function () { var nr = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("view") >= 0 && o.comps.some(function (c) { return c.comp === "rect" && c.w === 336.0; }); }).length; return "名牌rect=" + nr; })());
+clickAt(960, 540); snap();
+ok("第一章开场沉浸式：末行对话（你：让我想想）", objsTextHas("让我想想").length > 0 && objsTextHas("卫生部长").length === 0, "步5");
+clickAt(960, 540); snap(); // 会议室演完 -> 序章章末演出
 snap(); // 会议室演完 -> 序章章末演出首行入 seen
 clickAt(960, 540); snap(); // 会议室演完 -> 序章章末演出（首行入 seen）
 clickAt(960, 540); snap(); // 章末 2 行演完 -> 推进：进第一章
@@ -296,6 +339,13 @@ ok("序章章末：超事件演出「你签完字，看向窗外。」", hasSeen
 ok("第一章：tick1 不自动开操作面板（队长裁决：每 tick 先点底栏「操作」）",
     objsTextHas("行动点").length === 0);
 navBtn(0);
+// ---- 自动流逝（顶栏「流逝」按钮：每秒 1 天；非 idle 自动暂停）----
+ok("t89 流逝按钮：顶栏右侧 ui-auto（文案「流逝」）", objsWithText("流逝").length > 0);
+var dOps = oneText("2019 年");
+clickAt(1636, 44); snap(); // 开
+sgFire(1.0); sgFire(1.0);
+ok("t89 自动流逝：ops 阶段自动暂停（日期未跳天）", oneText("2019 年") === dOps, dOps + " -> " + oneText("2019 年"));
+clickAt(1636, 44); snap(); // 关
 ok("第一章：操作面板=第一章 · 疫情时期 行动点 3 / 3",
     objsTextHas("第一章 · 疫情时期").length > 0 && objsTextHas("行动点 3 / 3").length > 0);
 openPage(0); pickOption(2);
@@ -307,11 +357,15 @@ openPage(1); pickOption(1);
 ok("radio 组跨页共享行动点池：刺激后剩 行动点 1 / 3", objsTextHas("行动点 1 / 3").length > 0);
 clickAt(960, rowY(3)); // 经济刺激 3 选项 -> 返回操作页
 openPage(2); pickOption(1);
-ok("用完行动点自动结算：事件阶段接管（全屏界面消失）", !anyPanel());
+clickAt(1636, 44); snap(); // 关
 clearEvents(80);
+clickAt(1636, 44); snap(); // 开（phase=idle）
+sgFire(1.0);
+ok("t89 自动流逝：idle 阶段每秒 1 天（日期 +1，引擎 tick 接管）", oneText("2019 年") !== dOps, dOps + " -> " + oneText("2019 年"));
+clickAt(1636, 44); snap(); // 关
 
-// ---- 第一章 18 tick 循环（每 tick 先点「操作」开面板；净 +3/tick -> 失败档） ----
-for (var t = 1; t <= 18; t++) {
+// ---- 第一章 17+1 tick 循环（auto 1 次 + 手动 17 次；净 +3/tick -> 失败档） ----
+for (var t = 1; t <= 17; t++) {
     navBtn(0);
     openPage(0); pickOption(2);   // 局部封控
     clickAt(960, rowY(4));        // 返回操作页

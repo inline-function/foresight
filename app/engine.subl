@@ -32,7 +32,9 @@ fun F_STEP(): Nat = 16
 fun F_CHEND(): Nat = 17
 fun F_CHNEXT(): Nat = 18
 fun F_SCROLL(): Nat = 19
-fun F_N(): Nat = 20
+fun F_DRAWER(): Nat = 20
+fun F_TROOPS(): Nat = 21
+fun F_N(): Nat = 22
 
 // ---------- 字段读写 ----------
 fun catS(a: Str, b: Str): Str = concat(concat(a, "@"), b)
@@ -304,6 +306,8 @@ fun engInit(md: Json, ent: Json): Str {
     s = catS(s, "")
     s = catS(s, "-1")
     s = catS(s, "0")
+    s = catS(s, "none")
+    s = catS(s, "|")  // troops: name:n|name:n|…
     return s
 }
 

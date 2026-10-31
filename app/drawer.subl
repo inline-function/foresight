@@ -1,0 +1,200 @@
+// drawer.subl —— 地块详情抽屉（左侧滑出；MD3 NavigationDrawer 风格）
+// 打开方式：点击陆地/海域地块 -> F_DRAWER = "地名"（查看）或 "m:地名"（移动军队）；"none" = 关闭。
+// 三要素 + 元数据：地块名 / 归属国家 / 属性（人口·稳定度·发展程度）/ 标签 chips / 驻军（仅数量，
+// 可移动到邻接地/海域，邻接来自 east-data 邻接表）。内容由模组 entities.blocks 提供。
+
+// ---------- 几何与色板 ----------
+fun DR_W(): Rat = 620.0
+fun DR_Z(): Rat = 36.0
+fun DR_CARD(): Str = "#242A31"
+fun DR_CHIP(): Str = "#2E353D"
+fun DR_LINE(): Str = "#3A424B"
+fun DR_PRI(): Str = "#A6C8FF"
+fun DR_ONPRI(): Str = "#05243F"
+fun DR_OFF_X(): Rat = -620.0
+fun DR_SPEED(): Rat = 5600.0
+fun DR_TXT(): Str = "#E4E7EA"
+fun DR_SUB(): Str = "#9AA4AF"
+
+// ---------- 状态字段读写 ----------
+@impure
+fun drawerNameOf(dr: Str): Str =
+    if (startsWith(dr, "m:")) substring(dr, 2, length(dr)) else dr
+@impure
+fun drawerClose(s: Str): Str {
+    objsDestroyTag("drawer")
+    return engSet(s, F_DRAWER(), "none")
+}
+
+// ---------- 地块数据 ----------
+@impure
+fun regionOf(blocks: Json, name: Str): Json =
+    regionLoop(blocks, 0, arrLen(blocks), name)
+@impure
+fun regionLoop(bs: Json, i: Nat, n: Nat, name: Str): Json =
+    if (i >= n) emptyJson()
+    else (if (strCmp(jstr(arrAt(bs, i), "name"), name) == 0) arrAt(bs, i) else regionLoop(bs, (i + 1), n, name))
+@impure
+fun ownerNameOf(ent: Json, rg: Json): Str =
+    if (strCmp(jstr(rg, "owner"), "") == 0) "公海" else countryName(ent, jstr(rg, "owner"))
+@impure
+fun drNum(n: Rat): Str = strReplace(toStr(n), ".0", "")
+
+// ---------- 驻军状态（F_TROOPS = "name:n|name:n|…"） ----------
+@impure
+fun troopOf(s: Str, name: Str, d: Rat): Rat =
+    troopLoop(strSplit(s, "|"), 0, length(s), name, d)
+@impure
+fun troopLoop(entries: List[Str], i: Nat, n: Nat, name: Str, d: Rat): Rat =
+    if (i >= n) d
+    else {
+        var e: Str = strOr(elementAt(entries, i), "")
+        var k: Nat = natOr(strIndexOf(e, ":"), 0)
+        if (strCmp(substring(e, 0, k), name) == 0)
+            getOrElse(parseRat(substring(e, (k + 1), length(e))), 0.0)
+        else troopLoop(entries, (i + 1), n, name, d)
+    }
+@impure
+fun troopSet(s: Str, name: Str, v: Rat): Str =
+    troopReplace(strSplit(s, "|"), 0, length(s), concat(concat(name, ":"), concat(toStr(v), "|")))
+
+@impure
+fun troopReplace(entries: List[Str], i: Nat, n: Nat, made: Str): Str =
+    if (i >= n) made
+    else {
+        var e: Str = strOr(elementAt(entries, i), "")
+        var k: Nat = natOr(strIndexOf(e, ":"), 0)
+        if (strCmp(substring(e, 0, k), nameOfTroopEntry(made)) == 0) troopReplace(entries, (i + 1), n, made)
+        else troopReplace(entries, (i + 1), n, concat(made, e))
+    }
+fun nameOfTroopEntry(made: Str): Str = substring(made, 0, natOr(strIndexOf(made, ":"), 0))
+// 驻军缺省值（引擎未记录时取模组 blocks 数据）
+@impure
+fun troopDefault(ent: Json, name: Str): Rat =
+    jnum(regionOf(jk(ent, "blocks"), name), "troops")
+
+// ---------- 邻接表（east-data.subl adjTable()） ----------
+@impure
+fun adjNames(name: Str): List[Str] =
+    adjRow(strSplit(adjTable(), "|"), 0, length(adjTable()), name)
+@impure
+fun adjRow(rows: List[Str], i: Nat, n: Nat, name: Str): List[Str] =
+    if (i >= n) emptyList()
+    else {
+        var r: Str = strOr(elementAt(rows, i), "")
+        if (startsWith(r, concat(name, ":")))
+            strSplit(substring(r, (length(name) + 1), length(r)), ",")
+        else adjRow(rows, (i + 1), n, name)
+    }
+
+// ---------- 抽屉构建（返回 (对象, 基x, 基y) 列表供滑入动画） ----------
+@impure
+fun buildDrawer(m: Json, st: Str): List[(Any, Rat, Rat)] {
+    var dr: Str = engField(st, F_DRAWER())
+    var nm: Str = drawerNameOf(dr)
+    var move: Bool = false
+    var ent: Json = modEnt(m)
+    var rg: Json = regionOf(jk(ent, "blocks"), nm)
+    var trps: Rat = troopOf(engField(st, F_TROOPS()), nm, jnum(rg, "troops"))
+    @mut var p: List[(Any, Rat, Rat)] = emptyList()
+    p = cons((addRoundRect(DR_W(), 1080.0, 0.0, 0.0, DR_CARD(), "drawer", DR_Z(), 24.0), 0.0, 0.0), p)
+    p = cons((addRoundRect(72.0, 72.0, 520.0, 24.0, DR_LINE(), "drawer", DR_Z(), 20.0), 520.0, 24.0), p)
+    p = cons((addTextT("x", 548.0, 40.0, 40.0, 700, DR_TXT(), "drawer", true, DR_Z()), 548.0, 40.0), p)
+    p = cons((addTextT(nm, 40.0, 84.0, 42.0, 700, DR_TXT(), "drawer", true, DR_Z()), 40.0, 84.0), p)
+    p = cons((addTextT(concat("归属 ", ownerNameOf(ent, rg)), 40.0, 148.0, 26.0, 400, DR_SUB(), "drawer", true, DR_Z()), 40.0, 148.0), p)
+    p = cons((addRectT(548.0, 2.0, 36.0, 196.0, DR_LINE(), "drawer", DR_Z()), 36.0, 196.0), p)
+    // 属性
+    p = drAttr(p, 224.0, "人口", concat(drNum(jnum(rg, "pop")), " 万"))
+    p = drAttr(p, 300.0, "稳定度", concat(drNum(jnum(rg, "stab")), " / 100"))
+    p = drAttr(p, 376.0, "发展程度", concat(drNum(jnum(rg, "dev")), " / 10"))
+    p = cons((addRectT(548.0, 2.0, 36.0, 452.0, DR_LINE(), "drawer", DR_Z()), 36.0, 452.0), p)
+    p = cons((addTextT("标签", 40.0, 476.0, 22.0, 600, DR_SUB(), "drawer", true, DR_Z()), 40.0, 476.0), p)
+    p = drTags(p, jk(rg, "tags"), 0, arrLen(jk(rg, "tags")), 40.0, 512.0)
+    p = cons((addRectT(548.0, 2.0, 36.0, 640.0, DR_LINE(), "drawer", DR_Z()), 36.0, 640.0), p)
+
+
+        p = cons((addTextT("驻扎军队", 40.0, 664.0, 22.0, 600, DR_SUB(), "drawer", true, DR_Z()), 40.0, 664.0), p)
+        p = cons((addTextT(drNum(trps), 40.0, 700.0, 46.0, 700, DR_TXT(), "drawer", true, DR_Z()), 40.0, 700.0), p)
+        if (trps > 0.0) {
+            p = cons((addRoundRect(260.0, 64.0, 320.0, 704.0, DR_PRI(), "drawer", DR_Z(), 20.0), 320.0, 704.0), p)
+            p = cons((addTextT("移动军队", 356.0, 720.0, 27.0, 700, DR_ONPRI(), "drawer", true, DR_Z()), 356.0, 720.0), p)
+        } else {
+            p = cons((addRoundRect(260.0, 64.0, 320.0, 704.0, DR_LINE(), "drawer", DR_Z(), 20.0), 320.0, 704.0), p)
+            p = cons((addTextT("无可移动军队", 340.0, 722.0, 22.0, 400, DR_SUB(), "drawer", true, DR_Z()), 340.0, 722.0), p)
+        }
+
+    return p
+}
+@impure
+fun drAttr(p: List[(Any, Rat, Rat)], y: Rat, lb: Str, vl: Str): List[(Any, Rat, Rat)] =
+    cons((addTextT(lb, 40.0, y, 22.0, 400, DR_SUB(), "drawer", true, DR_Z()), 40.0, y), cons((addTextT(vl, 240.0, (y - 4.0), 30.0, 600, DR_TXT(), "drawer", true, DR_Z()), 240.0, (y - 4.0)), p))
+@impure
+fun drTags(p: List[(Any, Rat, Rat)], tags: Json, i: Nat, n: Nat, x: Rat, y: Rat): List[(Any, Rat, Rat)] =
+    if (i >= n) p
+    else {
+        var tg: Str = strOr(jsonStr(arrAt(tags, i)), "")
+        var w: Rat = (44.0 + (toRat(length(tg)) * 24.0))
+        var xx: Rat = if ((x + w) > 580.0) 40.0 else x
+        var yy: Rat = if ((x + w) > 580.0) (y + 64.0) else y
+        var q: List[(Any, Rat, Rat)] = cons((addRoundRect(w, 52.0, xx, yy, DR_CHIP(), "drawer", DR_Z(), 26.0), xx, yy), p)
+        var q2: List[(Any, Rat, Rat)] = cons((addTextT(tg, (xx + 22.0), (yy + 13.0), 22.0, 400, DR_TXT(), "drawer", true, DR_Z()), (xx + 22.0), (yy + 13.0)), q)
+        drTags(q2, tags, (i + 1), n, (xx + w + 12.0), yy)
+    }
+// ---------- 滑入动画 ----------
+@impure
+fun drShift(pairs: List[(Any, Rat, Rat)], off: Rat): Null =
+    when (pairs) {
+        is Nil() => null
+        is Cons((o, x, y), rest) => { unchecked objUse(o, compPos((x + off), y)); drShift(rest, off) }
+    }
+
+// ---------- 抽屉内点击 ----------
+// 命中判定坐标系为屏幕坐标（抽屉为 fixed UI）。
+@impure
+fun drawerHit(m: Json, st: Str, mx: Rat, my: Rat): Str {
+    var dr: Str = engField(st, F_DRAWER())
+    var nm: Str = drawerNameOf(dr)
+    var trps: Rat = troopOf(engField(st, F_TROOPS()), nm, troopDefault(modEnt(m), nm))
+    if (strCmp(dr, "none") == 0) { return st } else null
+    if ((mx >= 520.0) && (mx < 592.0) && (my >= 24.0) && (my < 96.0)) { return drawerClose(st) } else {
+        if ((trps > 0.0) && (mx >= 320.0) && (mx < 580.0) && (my >= 704.0) && (my < 768.0)) {
+            return engSet(st, F_DRAWER(), concat("m:", nm))
+        } else null
+        return engSet(st, F_DRAWER(), "pass")
+    }
+}
+
+@impure
+fun drawerMoveOne(m: Json, st: Str, from: Str, to: Str): Str {
+    var ts: Str = engField(st, F_TROOPS())
+    var trps: Rat = troopOf(ts, from, troopDefault(modEnt(m), from))
+    var td: Rat = troopOf(ts, to, troopDefault(modEnt(m), to))
+    if (trps <= 0.0) { return st } else null
+    var t2: Str = troopSet(ts, from, (trps - 1.0))
+    var t3: Str = troopSet(t2, to, (td + 1.0))
+    var s2: Str = engSet(st, F_TROOPS(), t3)
+    return engSet(s2, F_DRAWER(), concat("m:", from))
+}
+// ---------- 移动模式：地图高亮可前往地块 ----------
+fun MOVE_HI(): Str = "#9CC7FF"
+@impure
+fun drawMoveHi(geo: Any, n: Nat, geoSea: Any, nSea: Nat, src: Str): Null {
+    var nbs: List[Str] = adjNames(src)
+    moveHiLoop(geo, n, 0, nbs)
+    moveHiLoop(geoSea, nSea, 0, nbs)
+    return null
+}
+@impure
+fun moveHiLoop(geo: Any, n: Nat, i: Nat, nbs: List[Str]): Null =
+    if (i >= n) null
+    else {
+        if (nameInList(nbs, 0, size(nbs), mapProvName(geo, i))) {
+            var o: Any = mapProvObj(geo, i, MOVE_HI())
+            objTag(o, "movetarget")
+        } else null
+        moveHiLoop(geo, n, (i + 1), nbs)
+    }
+@impure
+fun nameInList(lst: List[Str], i: Nat, n: Nat, name: Str): Bool =
+    if (i >= n) false
+    else (if (strCmp(strOr(elementAt(lst, i), ""), name) == 0) true else nameInList(lst, (i + 1), n, name))

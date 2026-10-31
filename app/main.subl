@@ -215,6 +215,18 @@ fun renderBgLoop(geo: Any, n: Nat, i: Nat): Null =
     }
 @impure
 fun renderBg(geo: Any, n: Nat): Null = renderBgLoop(geo, n, 0)
+// ---------- 海域地块（渲染于陆地之下；C_OCEAN 深一层蓝） ----------
+fun C_OCEAN(): Str = "#1B4A66"
+@impure
+fun renderSeaLoop(geo: Any, n: Nat, i: Nat): Null =
+    if (i >= n) null
+    else {
+        var o: Any = mapProvObj(geo, i, C_OCEAN())
+        objTag(o, "seaprov")
+        renderSeaLoop(geo, n, (i + 1))
+    }
+@impure
+fun renderSea(geo: Any, n: Nat): Null = renderSeaLoop(geo, n, 0)
 
 @impure
 fun applyView(viewS: Rat, viewX: Rat, viewY: Rat): Null {
@@ -248,16 +260,24 @@ fun runSmoke(): Null {
     var n: Nat = mapProvCount(geo)
     var geoBg: Any = mapLoad(tblX2(mapEastBg()))
     var nBg: Nat = mapProvCount(geoBg)
+    var geoSea: Any = mapLoad(tblX2(mapSea()))
+    var nSea: Nat = mapProvCount(geoSea)
     var bg: Any = objAdd()
     unchecked objUse(bg, compPos((TX0() - PAD()), (TY0() - PAD())))
     unchecked objUse(bg, compRect(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0))))
     unchecked objUse(bg, compColorHex(COL_SEA()))
     unchecked objTag(bg, "ui")
     @mut var sel: Int = -1
+    @mut var drX: Rat = 0.0
+    @mut var drPairs: List[(Any, Rat, Rat)] = emptyList()
+    @mut var autoOn: Bool = false
+    @mut var autoAcc: Rat = 0.0
     @mut var st: Str = engInit(md, ent)
     buildTopbar(m, st)
     var label: Any = addTextC("", 960.0, LABEL_Y(), 26.0, COL_SUB(), "ui", true, 22.0)
     buildBottombar(m)
+    drawAutoBtn(autoOn)
+    renderSea(geoSea, nSea)
     renderBg(geoBg, nBg)
     renderBlocks(geo, n, -1)
     @mut var viewS: Rat = 1.0
@@ -298,6 +318,18 @@ fun runSmoke(): Null {
         }
         }
     }
+    onUpdate { dt => if (drX < 0.0) {
+        var nx: Rat = (drX + (DR_SPEED() * dt))
+        drX = if (nx > 0.0) 0.0 else nx
+        drShift(drPairs, drX)
+    } else null;
+    if (autoOn) {
+        autoAcc = autoAcc + dt
+        if (autoAcc >= 1.0) {
+            autoAcc = autoAcc - 1.0
+            if (strCmp(engField(st, F_PHASE()), "idle") == 0) { st = engTickStart(m, st) } else null
+        } else null
+    } else { autoAcc = 0.0 } }
     onMouseDown("left") { _e => if (!pressed) {
         pressed = true
         moved = false
@@ -327,14 +359,24 @@ fun runSmoke(): Null {
     } }
     onMouseRelease("left") { _e => if (pressed) {
         objsDestroyTag("statelayer")
+        @mut var consumed: Bool = false
         if (!moved) {
             var ph: Str = engField(st, F_PHASE())
             if (strCmp(ph, "over") == 0) null
             else {
-                if (strCmp(ph, "events") == 0) { st = engViewClick(m, st, pressX, pressY) }
+                    if (strCmp(ph, "events") == 0) { if (strCmp(engField(st, F_DRAWER()), "none") != 0) { st = drawerClose(st) } else null; st = engViewClick(m, st, pressX, pressY) }
                 else {
-                    var b: Nat = whichBtn(pressX, pressY)
+                    if ((strCmp(engField(st, F_PANEL()), "none") == 0)
+                        && (pressX >= AUTO_X()) && (pressX < (AUTO_X() + AUTO_S()))
+                        && (pressY >= AUTO_Y()) && (pressY < (AUTO_Y() + AUTO_S()))) {
+                        autoOn = !autoOn
+                    consumed = true
+                        autoAcc = 0.0
+                        drawAutoBtn(autoOn)
+                    } else null
+                    var b: Nat = if (consumed) BTN_N() else whichBtn(pressX, pressY)
                     if (b < BTN_N()) {
+                    if (strCmp(engField(st, F_DRAWER()), "none") != 0) { st = drawerClose(st) } else null
                         var kind: Str = btnKind(b)
                         if (strCmp(kind, engField(st, F_PANEL())) == 0) {
                             objsDestroyTag("panel")
@@ -352,7 +394,54 @@ fun runSmoke(): Null {
                             if (strCmp(pn, "ops") == 0) { st = opsPanelHit(m, st, pressX, pressY) }
                             else {
                                 if (strCmp(pn, "policy") == 0) { st = policyPanelHit(m, st, pressX, pressY) }
-                                else { if (strCmp(pn, "none") == 0) { sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY)) } else null }
+                                var pn2: Str = engField(st, F_PANEL())
+                                if ((strCmp(pn2, "none") == 0) && (!consumed)) {
+                                    @mut var wx: Rat = worldXOf(viewS, viewX, pressX)
+                                    @mut var wy: Rat = worldYOf(viewS, viewY, pressY)
+                                    @mut var seaHit: Bool = false
+                                    @mut var hit: Int = mapHitProv(geo, wx, wy)
+                                    if (hit < 0) {
+                                        var hs: Int = mapHitProv(geoSea, wx, wy)
+                                        if (hs >= 0) { hit = hs; seaHit = true } else null
+                                    } else null
+                                    var nm: Str = if (hit >= 0) (if (seaHit) mapProvName(geoSea, hit) else mapProvName(geo, hit)) else ""
+                                    var dr0: Str = engField(st, F_DRAWER())
+                                    if (startsWith(dr0, "m:")) {
+                                        var src: Str = drawerNameOf(dr0)
+                                        var nbs: List[Str] = adjNames(src)
+                                        if ((strCmp(nm, "") != 0) && (strCmp(nm, src) != 0) && nameInList(nbs, 0, size(nbs), nm)) {
+                                            st = drawerMoveOne(m, st, src, nm)
+                                            objTextSet(label, concat("已移动 1 支军队至 ", nm))
+                                        } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else { objsDestroyTag("movetarget"); st = engSet(st, F_DRAWER(), "none") } }
+                                    } else {
+                                        if (strCmp(dr0, "none") != 0) {
+                                            if (pressX < DR_W()) {
+                                                var s2: Str = drawerHit(m, st, pressX, pressY)
+                                                if (strCmp(engField(s2, F_DRAWER()), "pass") == 0) {
+                                                    var s3: Str = engSet(s2, F_DRAWER(), dr0)
+                                                    st = if (strCmp(nm, "") != 0) engSet(s3, F_DRAWER(), nm) else drawerClose(s3)
+                                                } else { st = s2 }
+                                            } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else { st = drawerClose(st) } }
+                                        } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else null }
+                                    }
+                                    var dr1: Str = engField(st, F_DRAWER())
+                                    if (startsWith(dr1, "m:")) {
+                                        objsDestroyTag("drawer")
+                                        if (!startsWith(dr0, "m:")) { drawMoveHi(geo, n, geoSea, nSea, drawerNameOf(dr1)) } else null
+                                        if (!startsWith(dr0, "m:")) { objTextSet(label, concat(concat("移动军队：点击高亮地块（", drawerNameOf(dr1)), "）")) } else null
+                                    } else {
+                                        objsDestroyTag("movetarget")
+                                        if (strCmp(dr1, "none") != 0) {
+                                            if ((strCmp(dr0, dr1) != 0) || (pressX < DR_W())) { drPairs = buildDrawer(m, st); drX = if (strCmp(dr0, "none") == 0) DR_OFF_X() else 0.0 } else null
+                                        } else null
+                                    }
+                                    if ((hit >= 0) && (!seaHit) && (hit != sel)) {
+                                        objsDestroyTag("block")
+                                        sel = hit
+                                        renderBlocks(geo, n, hit)
+                                        if (!startsWith(dr1, "m:")) { objTextSet(label, concat("已选：", nm)) } else null
+                                    } else null
+                                } else null
                             }
                         }
                     }

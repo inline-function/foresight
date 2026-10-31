@@ -393,6 +393,102 @@ W('fun mapEastFg(): Str = ' + JSON.stringify(bodyFg.join('|')));
 W('');
 W('@impure');
 W('fun mapEastBg(): Str = ' + JSON.stringify(bgParts.join('|')));
+// ---- 海域地块（手绘粗粒度多边形，1x 世界像素；渲染于陆地之下，可点击）----
+// 东亚近海划为 9 个大地块：渤海/黄海/东海/南海/北部湾/泰国湾/日本海/鄂霍次克海/菲律宾海。
+var SEAS = [
+  { name: '渤海',   ring: [[645,150],[700,150],[705,200],[700,230],[660,230],[650,200]] },
+  { name: '黄海',   ring: [[650,230],[703,200],[712,290],[655,290],[640,260]] },
+  { name: '东海',   ring: [[685,255],[700,240],[760,245],[785,300],[770,335],[700,345],[675,320]] },
+  { name: '南海',   ring: [[540,345],[680,345],[700,400],[660,480],[560,480],[520,440]] },
+  { name: '北部湾', ring: [[485,350],[560,350],[565,395],[540,430],[490,430]] },
+  { name: '泰国湾', ring: [[520,445],[560,445],[570,480],[520,485]] },
+  { name: '日本海', ring: [[762,150],[800,150],[800,260],[760,260]] },
+  { name: '鄂霍次克海', ring: [[755,35],[890,35],[890,128],[800,148],[755,148]] },
+  { name: '菲律宾海', ring: [[780,150],[1040,150],[1040,520],[770,500],[765,320],[790,200]] },
+  { name: '北太平洋', ring: [[10,-180],[1030,-180],[1030,-25],[10,-25]] },
+  { name: '印度洋',   ring: [[10,-25],[180,-25],[180,515],[10,515]] },
+  { name: '南太平洋', ring: [[560,330],[1030,330],[1030,515],[560,515]] },
+];
+// 邻接表（几何边距阈值；陆-陆 6 / 陆-海 16 / 海-海 12）：name:邻1,邻2|...
+function parseRings(s) {
+  return s.split(';').map(function (r) {
+    return r.split(',').map(function (p) { var q = p.split(' '); return [parseFloat(q[0]), parseFloat(q[1])]; });
+  });
+}
+function ringsMinDist(ra, rb, limit) {
+  var best = limit;
+  for (var ai = 0; ai < ra.length; ai++) {
+    for (var bi = 0; bi < rb.length; bi++) {
+      var A = ra[ai], B = rb[bi];
+      var n = Math.max(A.length, B.length);
+      for (var k0 = 0; k0 < A.length; k0++) { var a0 = A[k0], a1 = A[(k0 + 1) % A.length];
+        for (var k1 = 0; k1 < B.length; k1++) { var b0 = B[k1], b1 = B[(k1 + 1) % B.length];
+          var d = segSeg(a0, a1, b0, b1);
+          if (d < best) best = d;
+        } }
+    } }
+  return best;
+}
+function segSeg(a0, a1, b0, b1) {
+  var d = segPt(b0, b1, a0); d = Math.min(d, segPt(b0, b1, a1));
+  d = Math.min(d, segPt(a0, a1, b0)); d = Math.min(d, segPt(a0, a1, b1));
+  return d;
+}
+function segPt(p, q, a) {
+  var dx = q[0] - p[0], dy = q[1] - p[1];
+  var L2 = dx * dx + dy * dy;
+  if (L2 === 0) return Math.hypot(a[0] - p[0], a[1] - p[1]);
+  var t = Math.max(0, Math.min(1, ((a[0] - p[0]) * dx + (a[1] - p[1]) * dy) / L2));
+  return Math.hypot(a[0] - (p[0] + t * dx), a[1] - (p[1] + t * dy));
+}
+var seaParts = SEAS.map(function (s) { return s.name + ':' + s.ring.map(function (v) { return v[0] + ' ' + v[1]; }).join(','); });
+var geo = bodyFg.map(function (row) { var k = row.indexOf(':'); return { name: row.slice(0, k), rings: parseRings(row.slice(k + 1)) }; });
+var adjList = [];
+for (var g1 = 0; g1 < geo.length; g1++) {
+  var nb = [];
+  for (var g2 = 0; g2 < geo.length; g2++) {
+    if (g2 === g1) continue;
+    if (ringsMinDist(geo[g1].rings, geo[g2].rings, 6) < 6) nb.push(geo[g2].name);
+  }
+  for (var s2 = 0; s2 < SEAS.length; s2++) {
+    if (ringsMinDist(geo[g1].rings, [SEAS[s2].ring], 16) < 16) nb.push(SEAS[s2].name);
+  }
+  adjList.push(geo[g1].name + ':' + nb.join(','));
+}
+for (var s1 = 0; s1 < SEAS.length; s1++) {
+  var nbs = [];
+  for (var g3 = 0; g3 < geo.length; g3++) {
+    if (ringsMinDist([SEAS[s1].ring], geo[g3].rings, 16) < 16) nbs.push(geo[g3].name);
+  }
+  for (var s3 = 0; s3 < SEAS.length; s3++) {
+    if (s3 === s1) continue;
+    if (ringsMinDist([SEAS[s1].ring], [SEAS[s3].ring], 12) < 12) nbs.push(SEAS[s3].name);
+  }
+  adjList.push(SEAS[s1].name + ':' + nbs.join(','));
+}
+// 邻接修正（scripts/adj-fix.js：DEL 双向删除 / ADD 双向补入；再对称化）
+var AF = require('./adj-fix');
+var adjMap = {};
+adjList.forEach(function (row) { var k = row.indexOf(':'); adjMap[row.slice(0, k)] = row.slice(k + 1).split(',').filter(function (n) { return n.length > 0; }); });
+Object.keys(AF.ADJ_DEL).forEach(function (a) { (AF.ADJ_DEL[a] || []).forEach(function (b) {
+  if (adjMap[a]) adjMap[a] = adjMap[a].filter(function (n) { return n !== b; });
+  if (adjMap[b]) adjMap[b] = adjMap[b].filter(function (n) { return n !== a; });
+}); });
+Object.keys(AF.ADJ_ADD).forEach(function (a) { (AF.ADJ_ADD[a] || []).forEach(function (b) {
+  if (adjMap[a] && adjMap[a].indexOf(b) < 0) adjMap[a].push(b);
+  if (adjMap[b] && adjMap[b].indexOf(a) < 0) adjMap[b].push(a);
+}); });
+Object.keys(adjMap).forEach(function (a) { adjMap[a].slice().forEach(function (b) { if (!adjMap[b]) adjMap[b] = []; if (adjMap[b].indexOf(a) < 0) adjMap[b].push(a); }); });
+Object.keys(adjMap).forEach(function (a) { adjMap[a].sort(); });
+adjList = Object.keys(adjMap).map(function (nm) { return nm + ':' + adjMap[nm].join(','); });
+W('');
+W('// 海域地块表（12 块；渲染于陆地之下、可点击、可驻扎舰队）');
+W('@impure');
+W('fun mapSea(): Str = ' + JSON.stringify(seaParts.join('|')));
+W('');
+W('// 邻接表（几何边距 + adj-fix 真实性修正）：name:邻1,邻2|name:...');
+W('fun adjTable(): Str = ' + JSON.stringify(adjList.join('|')));
+console.log('海域 ' + SEAS.length + ' 块；邻接表 ' + adjList.length + ' 条');
 fs.writeFileSync(path.join(G, 'app', 'east-data.subl'), dst);
 
 // 探针目标：按已生成地块（合并块）的质心（bbox 中心世界像素）；idx = fg 表内地块索引（命中应精确等于它）。

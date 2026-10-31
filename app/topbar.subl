@@ -11,6 +11,9 @@ fun TBAR_HEX(): Str = "#1F2327"
 fun SUB_HEX(): Str = "#B7BFC8"
 fun RES_HEX(): Str = "#E4E7EA"
 fun CHIP_HEX(): Str = "#2A2F35"
+fun AUTO_X(): Rat = 1612.0
+fun AUTO_Y(): Rat = 20.0
+fun AUTO_S(): Rat = 48.0
 
 @impure
 fun buildTopbar(m: Json, s: Str): Null {
@@ -35,7 +38,18 @@ fun refreshTopbar(m: Json, s: Str): Null {
     null
 }
 
+// 流逝按钮（顶栏右侧：每秒自动 tick 1 天；on = 进行中）
+@impure
+fun drawAutoBtn(on: Bool): Null {
+    objsDestroyTag("ui-auto")
+    var hex: Str = if (on) PRIMARY_HEX() else CHIP_HEX()
+    var tc: Str = if (on) ON_PRIMARY() else SUB_HEX()
+    var bd: Any = addRoundRect(AUTO_S(), AUTO_S(), AUTO_X(), AUTO_Y(), hex, "ui-auto", 12.0, 24.0)
+    var tx: Any = addTextC("流逝", (AUTO_X() + (AUTO_S() / 2.0)), (AUTO_Y() + 13.0), 18.0, tc, "ui-auto", true, 13.0)
+    null
+}
 // 资源 chips（前 3 项：MD3 pill = 圆角容器 + 居中文本）
+
 @impure
 fun resChipLoop(m: Json, s: Str, i: Nat, n: Nat): Null =
     if ((i >= n) || (i >= resCount(modEnt(m)))) null
