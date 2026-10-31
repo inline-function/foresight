@@ -138,7 +138,7 @@ fun runSmoke(): Null {
     var ent: Json = modEnt(m)
     var geo: Any = mapLoad(mapTableOf(ent))
     var n: Nat = mapProvCount(geo)
-    var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()))
+    var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_BG())
     objTag(bg, "ui")
     @mut var sel: Int = -1
     @mut var st: Str = engInit(md, ent)

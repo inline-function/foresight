@@ -50,7 +50,7 @@ fun buildButtonsLoop(m: Json, i: Nat, n: Nat): Null =
 fun panelHead(kind: Str): Any {
     var head: Any = addRectT(PN_W(), 44.0, PN_X(), PN_Y(), PN_HEX(), "panel", 20.0)
     var ht: Any = addTextT(kind, (PN_X() + 18.0), (PN_Y() + 12.0), 16.0, 700, "#F0F4F8", "panel", true, 21.0)
-    head
+    return head
 }
 @impure
 fun panelBody(): Any = addRectT(PN_W(), 320.0, PN_X(), (PN_Y() + 44.0), BODY_HEX(), "panel", 20.0)
@@ -69,7 +69,7 @@ fun renderPanelKind(m: Json, s: Str, kind: Str): Str {
     var b1: Any = panelBody()
     if (strCmp(kind, "policy") == 0) renderPolicyRows(m, s, 0, policyCount(ent))
     else { if (strCmp(kind, "attrs") == 0) renderAttrRows(m, s, 0, resCount(ent)) else renderBlocksRows(m, 0, blockCount(ent)) }
-    engSet(s, F_PANEL(), kind)
+    return engSet(s, F_PANEL(), kind)
 }
 @impure
 fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat): Null =
@@ -117,12 +117,10 @@ fun renderBlocksRows(m: Json, i: Nat, n: Nat): Null =
     }
 @impure
 fun policyPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
-    if ((mx < PN_X()) || (mx > (PN_X() + PN_W()))) s
-    else {
-        var n: Nat = policyCount(modEnt(m))
-        var ri: Nat = panelRowHit(my, n)
-        if (ri < n) engPolicyAcquire(m, s, ri) else s
-    }
+    if ((mx < PN_X()) || (mx > (PN_X() + PN_W()))) { return s } else null
+    var n: Nat = policyCount(modEnt(m))
+    var ri: Nat = panelRowHit(my, n)
+    return (if (ri < n) engPolicyAcquire(m, s, ri) else s)
 }
 
 // ---------- 操作面板：页列表（本体按章切换内容） ----------
@@ -138,8 +136,11 @@ fun renderOpsMain(m: Json, s: Str): Null {
     var skip: Any = addTextT("结束操作（不操作，直接结算）", (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(rows))), 13.0, 400, COL_SKIP(), "panel", true, 21.0)
     null
 }
+@impure
+@impure
 fun opsMainTitle(ent: Json, ci: Nat, s: Str): Str =
     concat(concat(concat(chapterAct(ent, ci), " · "), chapterName(ent, ci)), opsApText(s))
+@impure
 fun opsApText(s: Str): Str = concat(concat("  行动点 ", toStr(engNum(s, F_AP()))), concat(" / ", toStr(engNum(s, F_APMAX()))))
 @impure
 fun renderOpsMainRows(m: Json, s: Str, i: Nat, n: Nat): Null =
@@ -170,8 +171,7 @@ fun renderOpsPage(m: Json, s: Str, pid: Nat): Null {
 @impure
 fun opsStripText(m: Json, s: Str, pg: Json): Str {
     var ap: Str = concat(concat(concat("行动点 ", toStr(engNum(s, F_AP()))), " / "), toStr(engNum(s, F_APMAX())))
-    var mk: Str = concat(ap, opsStatusLoop(m, s, jk(pg, "status"), 0, arrLen(jk(pg, "status")), ""))
-    mk
+    return concat(ap, opsStatusLoop(m, s, jk(pg, "status"), 0, arrLen(jk(pg, "status")), ""))
 }
 @impure
 fun opsStatusLoop(m: Json, s: Str, st: Json, i: Nat, n: Nat, acc: Str): Str =
@@ -200,20 +200,16 @@ fun renderOpsPageRows(m: Json, s: Str, pid: Nat, pg: Json, i: Nat, n: Nat): Null
 fun opsPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
     var ent: Json = modEnt(m)
     var ops: Json = chapterOps(ent, engNum(s, F_CHAP()))
-    if ((mx < PN_X()) || (mx > (PN_X() + PN_W()))) s
-    else {
-        if (strCmp(engField(s, F_PAGE()), "L") == 0) {
-            var rows: Nat = arrLen(ops)
-            var ri: Nat = panelRowHit(my, (rows + 1))
-            if (ri < rows) engOpenOpsPage(m, s, ri)
-            else { if (ri == rows) engOpsSkip(m, s) else s }
-        } else {
-            var pid: Nat = natOr(parseNat(engField(s, F_PAGE())), 0)
-            var opts: Json = jk(arrAt(ops, pid), "options")
-            var rows: Nat = arrLen(opts)
-            var ri: Nat = panelRowHit(my, (rows + 1))
-            if (ri < rows) engOpsExec(m, s, pid, ri)
-            else { if (ri == rows) engOpsBack(m, s) else s }
-        }
+    if ((mx < PN_X()) || (mx > (PN_X() + PN_W()))) { return s } else null
+    if (strCmp(engField(s, F_PAGE()), "L") == 0) {
+        var rows: Nat = arrLen(ops)
+        var ri: Nat = panelRowHit(my, (rows + 1))
+        return (if (ri < rows) engOpenOpsPage(m, s, ri) else (if (ri == rows) engOpsSkip(m, s) else s))
+    } else {
+        var pid: Nat = natOr(parseNat(engField(s, F_PAGE())), 0)
+        var opts: Json = jk(arrAt(ops, pid), "options")
+        var rows2: Nat = arrLen(opts)
+        var ri2: Nat = panelRowHit(my, (rows2 + 1))
+        return (if (ri2 < rows2) engOpsExec(m, s, pid, ri2) else (if (ri2 == rows2) engOpsBack(m, s) else s))
     }
 }

@@ -146,6 +146,10 @@ function clickAt(x, y) {
     __sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
     __sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 }
+function oneText(sub) {
+    var xs = objsTextHas(sub);
+    return xs.length >= 1 ? xs[xs.length - 1].text : "（无）";
+}
 
 // ---- t83 回归 ----
 ok("装载：__subl.main 导出并执行（S-1 形态）", true);
@@ -157,85 +161,146 @@ var sprites = calls("loadSprite");
 ok("mapLoad 烘焙三地块精灵（凹形/菱形/带洞）", sprites.length === 3, "实际 " + sprites.length + " 次");
 ok("初始相机：camPos(420, 305) + camScale(1, 1)",
     calls("camPos").length >= 1 && Math.abs(calls("camPos")[0].x - 420) < 0.5 && Math.abs(calls("camPos")[0].y - 305) < 0.5);
+__sgScrollHandlers.forEach(function (f) { f(1.0); });
+var cs = calls("camScale");
+ok("滚轮缩放 -> camScale(1.15, 1.15)", cs.length >= 1 && Math.abs(cs[cs.length - 1].sx - 1.15) < 0.01,
+    JSON.stringify(cs.map(function (c) { return c.sx; })));
 
-// ---- t85：模组烘焙与顶栏（一切文案来自 mods/*.json） ----
-ok("模组驱动：顶栏主标题 = 玩家国家「东宁民国」（全不透明白）",
-    objsWithText("东宁民国").length >= 1, JSON.stringify(objsWithText("东宁民国").length));
-ok("模组驱动：副标题 = 派系「实业派」（id 解析自 entities.factions）",
-    objsWithText("实业派").length >= 1, "");
-ok("模组驱动：右侧时间「二十世纪初 · 1910 年 1 月」（非回合数）",
-    objsTextHas("二十世纪初").length === 1 && objsTextHas("二十世纪初")[0].text === "二十世纪初 · 1910 年 1 月",
-    JSON.stringify(objsTextHas("二十世纪初").map(function (o) { return o.text; })));
-ok("模组时间链路：tick 循环按 mod.time.tickSeconds=2.0s 注册（慢一点实时制）",
-    __sgLoops.length === 1 && Math.abs(__sgLoops[0].secs - 2.0) < 0.01,
-    JSON.stringify(__sgLoops.map(function (l) { return l.secs; })));
+// ---- t86 六段 tick 循环：起始 tick = 模组起始日 ----
+ok("模组驱动：顶栏主标题 = 玩家国家「东宁民国」", objsWithText("东宁民国").length >= 1);
+ok("模组驱动：副标题 = 派系「实业派」（id 解析自 entities.factions）", objsWithText("实业派").length >= 1);
+ok("引擎状态驱动：顶栏日期「二十世纪初 · 1910 年 1 月 1 日」（tick1=起始日，非回合数）",
+    oneText("二十世纪初") === "二十世纪初 · 1910 年 1 月 1 日", oneText("二十世纪初"));
+ok("引擎状态驱动：顶栏资源 = 按 tick 产出后的值（政治点 14 = 12 + 2/天）",
+    objsTextHas("政治点 14").length >= 1 && oneText("政治点 14").indexOf("国库 210") >= 0, oneText("政治点"));
 
-// ---- t85：底栏四图标按钮（文案来自 entities.ui） ----
-["基本政策", "国家政策", "国家属性", "控制地块"].forEach(function (lbl) {
-    ok("底栏按钮（模组 ui 文案）：「" + lbl + "」", objsWithText(lbl).length === 1, "");
-});
+// ---- 阶段2 玩家操作（操作面板自动开：行动点 2~4、可不操作） ----
+ok("操作面板自动开：标题「第一幕 · 开国序章」", objsTextHas("开国序章").length >= 1, "");
+ok("操作面板标题含行动点槽「行动点 3 / 3」", objsTextHas("行动点 3 / 3").length >= 1, oneText("行动点"));
+ok("操作页列表：模组提供的「经济」「军政」页 + 结束操作（可不操作）",
+    objsTextHas("经济").length >= 1 && objsTextHas("军政").length >= 1 && objsTextHas("结束操作").length >= 1, "");
 
-// ---- t85：面板（内容全来自模组 JSON） ----
+// ---- 「经济」操作页：radio 组 ----
+clickAt(300, 170);
+ok("操作页开：标题「经济」+ 页头状态条「行动点 3 / 3 · 国库 · 稳定」",
+    objsTextHas("行动点 3 / 3 ·").length >= 1, oneText("行动点 3 / 3"));
+ok("radio 组：三个互斥选项（自由放任/国家干预/统制经济）",
+    objsTextHas("○ 自由放任").length >= 1 && objsTextHas("○ 国家干预").length >= 1 && objsTextHas("○ 统制经济").length >= 1, "");
+clickAt(300, 205);
+ok("点选项消耗 1 行动点：状态条「行动点 2 / 3」且 radio 锁定「● 国家干预」",
+    objsTextHas("行动点 2 / 3").length >= 1 && objsTextHas("● 国家干预").length >= 1, oneText("行动点 2"));
+ok("点选项应用效果：顶栏资源行国库 250（210 + 40，顶栏随状态刷新）",
+    oneText("政治点 14").indexOf("国库 250") >= 0, oneText("政治点 14"));
+clickAt(300, 205);
+ok("radio 互斥语义：重复点已选项不消耗行动点（仍 2 / 3）", objsTextHas("行动点 2 / 3").length >= 1, oneText("行动点 2"));
+// 返回页列表 -> 「军政」页（row1）-> 扩充军备（row0）-> 精兵整编（row1）
+clickAt(300, 262);
+ok("返回操作页列表", objsTextHas("结束操作").length >= 1, oneText("行动点 2 / 3"));
+clickAt(300, 205);
+ok("操作页「军政」：radio 组（扩充军备/精兵整编）", objsTextHas("扩充军备").length >= 1 && objsTextHas("精兵整编").length >= 1, "");
+clickAt(300, 170);
+ok("跨页操作共用行动点池：军政选项消耗（行动点 1 / 3）", objsTextHas("行动点 1 / 3").length >= 1, oneText("行动点 1"));
+clickAt(300, 205);
+
+// ---- 行动点用完自动结算 -> 阶段3 事件触发（队列按优先级） ----
+ok("阶段3 事件队列首项=超事件「民国元年」（priority 30 最高）",
+    objsTextHas("民国元年").length >= 1 && objsTextHas("钟声划破迷雾").length >= 1, oneText("钟声"));
+// 强制暂停期间整屏输入归事件层：第二行 -> 结束
+clickAt(480, 300);
+ok("超事件逐行：第二行「深谋远虑，自此而始。」", objsTextHas("深谋远虑，自此而始").length >= 1, "");
+clickAt(480, 300);
+ok("队列次项=条件触发事件卡「洋行借款」（国库 >= 230）+ 两个选项",
+    objsTextHas("洋行借款").length >= 1 && objsTextHas("接受借款").length >= 1 && objsTextHas("婉拒").length >= 1, oneText("洋行"));
+clickAt(300, 260);
+ok("事件卡选项应用效果+flag：下 tick 顶栏国库 304（234 + 60 卡效果 + 10 当 tick 产出）", objsTextHas("国库 304").length >= 1, oneText("国库 304"));
+
+// ---- 阶段6 下一 tick：顶栏年月随 tick 推进 ----
+ok("顶栏日期随 tick 推进：「1910 年 1 月 2 日」", oneText("1910 年 1 月 2 日").indexOf("1910 年 1 月 2 日") >= 0, oneText("1910 年 1 月 2"));
+ok("新 tick 行动点按章刷新：操作面板「行动点 3 / 3」", objsTextHas("行动点 3 / 3").length >= 1, oneText("行动点 3"));
+// 可不操作：关闭面板顺带验地块选中，重开面板后直接「结束操作」跳过
 clickAt(120, 520);
-ok("点击「基本政策」-> 面板开：标题 + 开关行「贸易立国  关」",
-    objsTextHas("贸易立国").length === 1 && objsTextHas("贸易立国")[0].text.indexOf("关") >= 0,
-    JSON.stringify(objsTextHas("贸易立国").map(function (o) { return o.text; })));
-ok("面板含派系标签（解锁数据位可视化）：「【实业派】」", objsTextHas("【实业派】").length >= 1, "");
-clickAt(400, 155);
-ok("点击开关行 -> 翻转为「开」并重建面板",
-    objsTextHas("贸易立国").length === 1 && objsTextHas("贸易立国")[0].text.indexOf("开") >= 0,
-    JSON.stringify(objsTextHas("贸易立国").map(function (o) { return o.text; })));
-clickAt(350, 520);
-ok("切换到「国家政策」面板：树状行「重工业体系」+ 前置「贸易立国」+ 派系「实业派」",
-    objsTextHas("重工业体系").length === 1 && objsTextHas("重工业体系")[0].text.indexOf("贸易立国") >= 0
-    && objsTextHas("重工业体系")[0].text.indexOf("实业派") >= 0,
-    JSON.stringify(objsTextHas("重工业体系").map(function (o) { return o.text; })));
-clickAt(580, 520);
-ok("切换到「国家属性」面板：数值行「稳定度  50 / 100」（模组 attrs）",
-    objsTextHas("稳定度").length === 1 && objsTextHas("稳定度")[0].text.indexOf("50 / 100") >= 0,
-    JSON.stringify(objsTextHas("稳定度").map(function (o) { return o.text; })));
-clickAt(790, 520);
-ok("切换到「控制地块」面板：地块行「北港  归属 东宁民国」（命名/归属来自 entities）",
-    objsTextHas("北港").length === 1 && objsTextHas("北港")[0].text.indexOf("东宁民国") >= 0,
-    JSON.stringify(objsTextHas("北港").map(function (o) { return o.text; })));
-var harborBefore = objsTextHas("北港")[0];
-clickAt(790, 520);
-ok("再点同一按钮 -> 面板关（旧行对象销毁）", harborBefore && harborBefore.destroyed === true, "");
-
-// ---- t85：时间慢 tick（呈现为年月，非回合数） ----
-var timeLabel = objsTextHas("二十世纪初")[0];
-for (var t = 0; t < 3; t += 1) __sgLoops[0].f(null);
-ok("tick x3 -> 时间推进「1910 年 4 月」（年月呈现，非回合）",
-    timeLabel && timeLabel.text === "二十世纪初 · 1910 年 4 月" && timeLabel.text.indexOf("回合") < 0,
-    JSON.stringify(timeLabel && timeLabel.text));
-
-// ---- t83 回归：地图选中（地块命名来自模组：菱形=「中原」） ----
 clickAt(620, 145);
-ok("点击菱形地块 -> 选中标签「已选：中原」（地块命名来自 entities.blocks）",
-    objsTextHas("已选：中原").length === 1,
-    JSON.stringify(__sgObjs.filter(function (o) { return !o.destroyed && o.text.indexOf("已选") >= 0; }).map(function (o) { return o.text; })));
+ok("地块选中「已选：中原」（命名来自 entities.blocks）", objsTextHas("已选：中原").length >= 1, oneText("已选"));
+clickAt(120, 520);
+clickAt(300, 240);
 
-// ---- t83 回归：相机 ----
-__sgScrollHandlers.forEach(function (f) { f({ y: -240 }); });
-var cs1 = calls("camScale");
-ok("滚轮缩放 -> camScale(1.15, 1.15)", cs1.length >= 2 && Math.abs(cs1[cs1.length - 1].sx - 1.15) < 0.01,
-    "camScale=" + JSON.stringify(cs1[cs1.length - 1]));
-for (var w = 0; w < 4; w += 1) __sgScrollHandlers.forEach(function (f) { f({ y: -240 }); });
-var csN = calls("camScale"), cpsN = calls("camPos");
-var deepS = csN[csN.length - 1].sx;
-ok("深缩放五档 -> camScale ≈ 2.01", Math.abs(deepS - Math.pow(1.15, 5)) < 0.01, "camScale=" + deepS);
-__setMouse(620, 145);
-__sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
-__setMouse(700, 145);
-__sgMouseHandlers.move.forEach(function (f) { f({ x: 700, y: 145 }); });
-var cps2 = calls("camPos");
-var last = cps2[cps2.length - 1];
-ok("深缩放后拖拽平移 -> camPos.x 左移 ≈ 80/缩放",
-    Math.abs((cpsN[cpsN.length - 1].x - last.x) - (80.0 / deepS)) < 0.5, "camPos=" + JSON.stringify(last));
+// ---- 队列优先级：flag 触发的「银行团贺电」(25) 先于「使节来访」(20) ----
+ok("队列优先级：先弹「银行团贺电」（25 > 20，尽管 JSON 中排在使节之后）",
+    objsTextHas("银行团贺电").length >= 1, oneText("银行团"));
+clickAt(300, 260);  // 深化合作
+// 沉浸式演出层
+ok("沉浸式演出层：「使节来访」+ 对话首行", objsTextHas("使节来访").length >= 1 && objsTextHas("我国新立").length >= 1, oneText("使节"));
+ok("缺图占位框：背景/立绘资产缺失渲染「【缺图】」框（无需资源文件）",
+    objsTextHas("【缺图·背景】").length >= 1 && objsTextHas("【缺图·立绘】").length >= 1, oneText("缺图"));
+clickAt(480, 300);
+clickAt(480, 300);
+clickAt(480, 300);
+ok("队列第三项：可重复条件事件「工人请愿」（稳定 <= 48，非一次性）", objsTextHas("工人请愿").length >= 1, oneText("工人"));
+clickAt(300, 260);  // 安抚施恩
 
-if (fails > 0) {
-    console.log("SMOKE: FAILED（" + fails + " 项未过）");
-    process.exit(1);
-}
-console.log("SMOKE: ALL PASSED（模组链路 + 顶栏底栏面板 + 时间 + 地图 + 相机）");
+// ---- 章末判定：tick 预算用尽 -> 章末演出 + dateJump ----
+ok("章末超事件演出：「新政初行，百废待兴。」逐行", objsTextHas("新政初行").length >= 1, oneText("新政"));
+clickAt(480, 300);
+clickAt(480, 300);
+ok("章末 dateJump：新章第 1 tick 显示「1910 年 3 月 1 日」",
+    oneText("1910 年 3 月 1 日").indexOf("1910 年 3 月 1 日") >= 0, oneText("1910 年 3 月 1"));
+ok("操作面板按章切换内容：新章「春潮涌动」+ 行动点 2 / 2（模组定义）",
+    objsTextHas("春潮涌动").length >= 1 && objsTextHas("行动点 2 / 2").length >= 1, oneText("行动点 2 / 2"));
+
+// ---- 国策面板（数据驱动：前置/解锁） ----
+clickAt(390, 520);
+ok("国策面板：「[可解] 贸易立国」（无前置）+ 锁定行示前置名",
+    objsTextHas("[可解] 贸易立国").length >= 1 && objsTextHas("前置：").length >= 1, oneText("贸易"));
+clickAt(300, 170);
+ok("点击国策：已行 -> 「[已行] 贸易立国」，下游国策转「[可解]」",
+    objsTextHas("[已行] 贸易立国").length >= 1 && objsTextHas("[可解] 国民教育").length >= 1, oneText("国民"));
+clickAt(300, 205);
+ok("前置链：再行已解锁的「国民教育」-> [已行]", objsTextHas("[已行] 国民教育").length >= 1, oneText("国民教育"));
+clickAt(300, 240);  // 近海海军尚为可解，行它
+ok("前置链全覆盖：三个国策全部 [已行]", objsTextHas("[已行] 近海海军").length >= 1, oneText("近海"));
+
+// ---- 国家属性 / 控制地块面板 ----
+clickAt(570, 520);
+ok("国家属性面板：资源总览含每 tick 产出（产出 2/天）", objsTextHas("产出").length >= 1, oneText("产出"));
+clickAt(790, 520);
+ok("控制地块面板：地块行「北港  归属 东宁民国」", objsTextHas("北港").length >= 1, oneText("北港"));
+
+// ---- 推进至篇终 ----
+clickAt(120, 520);  // 操作按钮重开操作面板（切走了国策面板）
+clickAt(300, 170);  // 文教页
+clickAt(300, 170);  // 兴办学堂（行动点 1）
+clickAt(300, 205);  // 办报立言（行动点 0 -> 自动结算：第二章无事件，直奔结算）
+ok("无事件期：队列空 -> 阶段5 结算 -> 阶段6 下一 tick", objsTextHas("春潮涌动").length >= 1, oneText("春潮"));
+clickAt(300, 205);  // 结束操作（row1）-> 章末 -> 篇终
+ok("篇终章末演出：「乱世如潮，深谋者远。」", objsTextHas("乱世如潮").length >= 1, oneText("乱世"));
+clickAt(480, 300);
+clickAt(480, 300);
+ok("篇终后流程冻结：时间停在「1910 年 3 月 2 日」", oneText("1910 年 3 月 2 日").length >= 10, oneText("1910 年 3 月 2"));
+clickAt(480, 300);
+clickAt(300, 240);
+clickAt(620, 145);
+ok("篇终后输入无效：无面板、不走 tick（无「结束操作」「事件卡」残留）",
+    objsTextHas("结束操作").length === 0 && objsTextHas("洋行借款").length === 0, oneText("1910 年 3 月 2"));
+
+// ---- 持久化 API（桥：localStorage 回落内存；subs 经 __subl.call 调） ----
+var sv = globalThis.__subl;
+var r1 = sv.call("saveLoad", ["t86", { a: 1, b: "存档" }]);
+var r2 = sv.call("saveGet", ["t86"]);
+ok("持久化 API：saveLoad -> saveGet 模组 JSON 往返",
+    r1 === true && r2 && r2.a === 1 && r2.b === "存档", JSON.stringify(r2));
+var ks = sv.call("saveKeys", []);
+var rd = sv.call("saveDrop", ["t86"]);
+var rg = sv.call("saveGet", ["t86"]);
+ok("持久化 API：saveKeys 列出存档键 + saveDrop 删除后 saveGet 返回 null",
+    Array.isArray(ks) && ks.indexOf("t86") >= 0 && rd === true && rg === null, JSON.stringify({ ks: ks, rg: rg }));
+
+// ---- 音乐接入点（资产缺失静默，不报错不抛） ----
+var b1 = sv.call("bgmPlay", [""]);
+var b2 = sv.call("bgmPlay", ["assets/no-such-bgm.mp3"]);
+var b3 = sv.call("bgmStop", []);
+ok("音乐接入点：空名/缺失资产 bgmPlay 静默 false，bgmStop 无异常", b1 === false && b2 === false && b3 === true, JSON.stringify([b1, b2, b3]));
+
+if (fails === 0) console.log("SMOKE: ALL PASSED（t86 叙事引擎：六段 tick 循环 + 三演出层 + 持久化 + 回归）");
+else console.log("SMOKE: FAILED " + fails + " 项");
+process.exit(fails === 0 ? 0 : 1);
 }

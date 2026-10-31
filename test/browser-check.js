@@ -1,7 +1,8 @@
 // browser-check.js - foresight 浏览器侧冒烟（CDP; node test/browser-check.js）
-// 打开 build/game/index.html（真实 Edge 无头），收 console/异常，读 WebGL 像素验证
-// 标题屏与地块渲染，存截图 test/browser-screenshot.png。Node 侧冒烟见 test/smoke.js。
-// 用法: node test/browser-check.js [<真实毫秒预算>]
+// 打开 build/game/index.html（真实 Edge 无头），收 console/异常，像素探针验证
+// 引擎驱动渲染（顶栏/地块/操作面板/超事件全屏黑底），驱动点击走一段 tick 循环，
+// 存截图 test/browser-screenshot.png。Node 侧冒烟见 test/smoke.js。
+// 用法: node test/browser-check.js
 "use strict";
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const PORT = 9444;
@@ -9,13 +10,11 @@ const fs = require('fs');
 const path = require('path');
 const OUT_PNG = path.join(__dirname, 'browser-screenshot.png');
 const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
-let done = false;
 async function main() {
   const { spawn, execFileSync } = await import('child_process');
-  const url = 'file:///' + path.join(__dirname, '..', 'build', 'game', 'index.html').replace(/\\/g, '/');
-  const budget = parseInt(process.argv[3] || '540000', 10);
+  const url = 'file:///' + path.join(__dirname, '..', 'build', 'game', 'index.html').replace(/\\\\/g, '/');
   const child = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-sandbox', '--window-size=1280,800',
-    '--remote-debugging-port=' + PORT, '--remote-allow-origins=*', '--user-data-dir=C:\\Temp\\edge-cdp-' + Date.now(), url],
+    '--remote-debugging-port=' + PORT, '--remote-allow-origins=*', '--user-data-dir=C:\\\\Temp\\\\edge-cdp-' + Date.now(), url],
     { stdio: 'ignore', detached: true });
   let targets = null;
   for (let i = 0; i < 80 && !targets; i++) {
@@ -27,6 +26,7 @@ async function main() {
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   let id = 0; const pend = {}; const exceptions = [];
   const send = function (method, params) { return new Promise(function (res) { var i2 = ++id; pend[i2] = res; ws.send(JSON.stringify({ id: i2, method: method, params: params || {} })); }); };
+  const evaluate = function (expr) { return send('Runtime.evaluate', { expression: expr, returnByValue: true }); };
   const lines = [];
   ws.onmessage = function (ev) {
     var m; try { m = JSON.parse(ev.data); } catch (e3) { return; }
@@ -34,7 +34,6 @@ async function main() {
     if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'log') {
       var txt = (m.params.args || []).map(function (a) { return a.value === undefined ? '' : a.value; }).join('');
       lines.push(String(txt));
-      if (String(txt).indexOf('CHECK-DONE') >= 0) done = true;
     }
     if (m.method === 'Runtime.exceptionThrown') {
       var d = m.params.exceptionDetails || {};
@@ -44,25 +43,63 @@ async function main() {
   };
   await new Promise(function (res) { ws.onopen = res; });
   await send('Runtime.enable'); await send('Page.enable');
-  // 固定等待：载入 + 字体就绪 + 首帧（场景静态，无 DONE 标记需求）
+  // 载入 + 首帧（tick1 操作面板自动开）
   var start = Date.now();
-  while ((Date.now() - start) < Math.min(budget, 12000)) { await sleep(1000); }
-  // 像素探针：逻辑画布 960x540 上的三点取样
-  var probe = "(function () { var cv = document.querySelector('canvas'); if (!cv) return 'NO-CANVAS';" +
+  while ((Date.now() - start) < 9000) { await sleep(1000); }
+  // 画布 CSS 包围盒 + letterbox 变换（世界 960x540 居中缩放进画布）
+  var rectExpr = "(function () { var cv = document.querySelector('canvas'); if (!cv) return null; var r = cv.getBoundingClientRect();" +
+    "var s = Math.min(r.width / 960, r.height / 540);" +
+    "return JSON.stringify({x: r.x + (r.width - 960 * s) / 2, y: r.y + (r.height - 540 * s) / 2, s: s}); })()";
+  var rect = null;
+  try { var rr = await evaluate(rectExpr); rect = rr && rr.result && JSON.parse(rr.result.value); } catch (e7) { rect = null; }
+  if (!rect) { console.log('CDP-FAIL 无 canvas 包围盒'); try { child.kill(); } catch (e8) {} process.exit(1); }
+  function pxToWin(lx, ly) { return { x: Math.round(rect.x + lx * rect.s), y: Math.round(rect.y + ly * rect.s) }; }
+  async function click(lx, ly) {
+    var p = pxToWin(lx, ly);
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+    await sleep(350);
+  }
+  // 像素探针：逻辑画布 960x540
+  var probeExpr = "(function () { var cv = document.querySelector('canvas'); if (!cv) return 'NO-CANVAS';" +
     "if (!window.__subl || typeof window.__subl.main !== 'function') return 'NO-SUBL';" +
     "var gl = cv.getContext('webgl2') || cv.getContext('webgl'); if (!gl) return 'NO-GL';" +
-    "function px(lx, ly) { var x = Math.round(lx * cv.width / 960), y = Math.round(ly * cv.height / 540);" +
+    "function px(lx, ly) { var s = Math.min(cv.width / 960, cv.height / 540);" +
+    "  var x = Math.round(((cv.width - 960 * s) / 2) + lx * s), y = Math.round(((cv.height - 540 * s) / 2) + ly * s);" +
     "  var p = new Uint8Array(4); gl.readPixels(x, cv.height - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p); return [p[0], p[1], p[2]]; }" +
-    "return JSON.stringify({ topbar: px(200, 10), bottombar: px(200, 520), sea: px(200, 300), block2: px(620, 145) }); })()";
-  var probeRes = null;
-  try { var r2 = await send('Runtime.evaluate', { expression: probe, returnByValue: true }); probeRes = r2 && r2.result && r2.result.value; }
-  catch (e4) { probeRes = 'EVAL-ERR'; }
+    "return JSON.stringify({ topbar: px(200, 10), bottombar: px(200, 520), sea: px(200, 300), block2: px(620, 145)," +
+    "  panel: px(300, 200), center: px(480, 270) }); })()";
+  async function probe(tag) {
+    var res = null;
+    try { var r2 = await evaluate(probeExpr); res = r2 && r2.result && r2.result.value; } catch (e4) { res = 'EVAL-ERR'; }
+    console.log('PROBE-' + tag + ' ' + res);
+    return res;
+  }
+  // 阶段2 玩家操作：经济页 -> 国家干预 -> 返回 -> 军政页 -> 扩充军备 -> 精兵整编（AP 0 -> 自动结算）
+  await probe('ops-panel');
+  await click(300, 170);  // 经济操作页
+  await click(300, 205);  // 国家干预（radio 锁定）
+  await click(300, 262);  // 返回操作页
+  await click(300, 205);  // 军政操作页
+  await click(300, 170);  // 扩充军备
+  await click(300, 205);  // 精兵整编 -> 行动点 0 -> 自动结算 -> 超事件（全屏黑底 z=50）
+  var p2 = await probe('super-event');
+  var blackOk = false;
+  try {
+    var j2 = JSON.parse(p2);
+    blackOk = (j2.center[0] + j2.center[1] + j2.center[2]) < 90 && (j2.bottombar[0] + j2.bottombar[1] + j2.bottombar[2]) < 90;
+  } catch (e10) {}
+  console.log('CHECK-SUPER-BLACK ' + (blackOk ? 'PASS 超事件全屏黑底覆盖（顶栏底栏被遮）' : 'FAIL 中心/底栏未黑 ' + p2));
+  // 超事件逐行 -> 下一项（事件卡/沉浸式）后截图
+  await click(480, 300);
+  await click(480, 300);
+  await click(480, 300);
+  await click(480, 300);
   var shot = null;
   try { var s = await send('Page.captureScreenshot', { format: 'png' }); if (s && s.data) { fs.writeFileSync(OUT_PNG, Buffer.from(s.data, 'base64')); shot = fs.statSync(OUT_PNG).size; } }
   catch (e9) {}
   console.log(lines.join('\n'));
   console.log('PAGE ' + url);
-  console.log('PROBE ' + probeRes);
   console.log('EXCEPTIONS ' + (exceptions.length ? exceptions.join(' | ') : 'none'));
   console.log('SCREENSHOT ' + (shot ? OUT_PNG + ' ' + shot + ' B' : 'not saved'));
   console.log('CDP-STATUS DONE 行=' + lines.length);
