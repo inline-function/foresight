@@ -1,20 +1,24 @@
-// views.subl —— 叙事演出层（事件卡 / 沉浸式 / 超事件 + 章末演出）
-// 三种层的内容（标题/正文/选项/逐行文本/背景/立绘/BGM 名）全部来自模组 entities.events，
-// 本体只提供几何与占位渲染；立绘/背景字段空（资产缺失）时渲染「缺图」占位框，无需资源文件。
-// 全部对象 tag="view"（z 26-50）：事件层高于面板(20)，超事件全屏高于顶栏(12)——演出期间输入一律交给事件层。
+// views.subl —— 叙事演出层（t89：1920x1080 MD3 Dialog/Card 风格）
+// 事件卡 = MD3 对话框（scrim + 圆角表面 + 标题/内容 + MD3 按钮选项）；
+// 沉浸式/超事件 = MD3 全屏对话框（黑底逐行保留）。
+// 三种层的内容全部来自模组 entities.events，本体只提供几何与缺图占位渲染。
+// tag="view"（z 26-100）：事件层高于全屏界面(30)，超事件全屏高于一切。
 @impure
 fun bgmHookOf(name: Str): Null = null
 
-// ---------- 演出层几何 ----------
-fun CC_X(): Rat = 240.0
-fun CC_W(): Rat = 480.0
-fun CC_Y(): Rat = 110.0
-fun CC_OPT_Y0(): Rat = 244.0
-fun CC_OPT_DY(): Rat = 38.0
-fun COL_CARD(): Str = "#1E2A38"
-fun COL_FRAME(): Str = "#3A4656"
-fun COL_INNER(): Str = "#131C28"
-fun COL_SOFT(): Str = "#D6DEE8"
+// ---------- 演出层几何（x2） ----------
+fun CC_X(): Rat = 480.0
+fun CC_W(): Rat = 960.0
+fun CC_Y(): Rat = 220.0
+fun CC_H(): Rat = 660.0
+fun CC_OPT_Y0(): Rat = 496.0
+fun CC_OPT_DY(): Rat = 84.0
+fun CC_OPT_H(): Rat = 72.0
+fun CC_RAD(): Rat = 56.0
+fun COL_CARD(): Str = "#2A2F35"
+fun COL_FRAME(): Str = "#8B939C"
+fun COL_INNER(): Str = "#171A1D"
+fun COL_SOFT(): Str = "#E4E7EA"
 fun COL_DIM(): Str = "#0B1016"
 fun COL_BLACK(): Str = "#000000"
 
@@ -28,13 +32,13 @@ fun renderView(m: Json, ev: Json, step: Nat): Null {
     null
 }
 
-// ---------- 事件卡：标题 + 内容 + 选项 ----------
+// ---------- 事件卡：MD3 Dialog（scrim + 圆角表面 + 标题 + 内容 + 按钮组） ----------
 @impure
 fun renderEventCard(m: Json, ev: Json, step: Nat): Null {
-    var o: Any = addRectT(960.0, 454.0, 0.0, 36.0, COL_DIM(), "view", 26.0)
-    var o2: Any = addRectT(CC_W(), 330.0, CC_X(), CC_Y(), COL_CARD(), "view", 28.0)
-    var tt: Any = addTextT(jstr(ev, "title"), 266.0, 128.0, 20.0, 700, COL_TITLE(), "view", true, 28.0)
-    var ct: Any = addTextT(jstr(ev, "content"), 266.0, 176.0, 15.0, 400, COL_SOFT(), "view", true, 28.0)
+    var o: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_DIM(), "view", 26.0)
+    var o2: Any = addRoundRect(CC_W(), CC_H(), CC_X(), CC_Y(), COL_CARD(), "view", 30.0, CC_RAD())
+    var tt: Any = addTextT(jstr(ev, "title"), (CC_X() + 48.0), (CC_Y() + 40.0), 40.0, 700, COL_SOFT(), "view", true, 32.0)
+    var ct: Any = addTextWrap(jstr(ev, "content"), (CC_X() + 48.0), (CC_Y() + 108.0), 28.0, 400, (CC_W() - 96.0), COL_SOFT(), "view", true, 32.0)
     renderCardOptLoop(m, jk(ev, "options"), 0, arrLen(jk(ev, "options")))
     null
 }
@@ -43,7 +47,10 @@ fun renderCardOptLoop(m: Json, opts: Json, i: Nat, n: Nat): Null =
     if (i >= n) null
     else {
         var nm: Str = jstr(arrAt(opts, i), "name")
-        var ot: Any = addTextT(concat("·  ", nm), 266.0, CC_OPT_Y0() + (CC_OPT_DY() * toRat(i)), 15.0, 400, COL_SOFT(), "view", true, 28.0)
+        var y: Rat = (CC_OPT_Y0() + (CC_OPT_DY() * toRat(i)))
+        // MD3 按钮混排：主选项 filled（Primary）/ 其余 tonal（Surface Container Highest）
+        var btn: Any = addRoundRect((CC_W() - 96.0), CC_OPT_H(), (CC_X() + 48.0), y, if (i == 0) "#A6C8FF" else "#363B42", "view", 31.0, 20.0)
+        var ot: Any = addTextT(nm, (CC_X() + 80.0), (y + 20.0), 26.0, 600, if (i == 0) "#05243F" else COL_SOFT(), "view", true, 32.0)
         renderCardOptLoop(m, opts, (i + 1), n)
     }
 @impure
@@ -53,24 +60,24 @@ fun cardRowHitLoop(y: Rat, dy: Rat, my: Rat, i: Nat, n: Nat): Nat =
 @impure
 fun cardRowHit(my: Rat, n: Nat): Nat = cardRowHitLoop(CC_OPT_Y0(), CC_OPT_DY(), my, 0, n)
 
-// ---------- 沉浸式：背景 + 立绘 + 对话逐行 + 继续 ----------
+// ---------- 沉浸式：MD3 全屏对话框（背景/立绘占位 + 逐行对话） ----------
 @impure
 fun renderImmersive(m: Json, ev: Json, step: Nat): Null {
-    var dim: Any = addRectT(960.0, 454.0, 0.0, 36.0, COL_DIM(), "view", 26.0)
+    var dim: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_DIM(), "view", 26.0)
     // 背景占位框（资产缺失：字段空 -> 缺图框；有路径 -> 缺图框+名，均不加载资源文件）
-    var bo: Any = addRectT(700.0, 300.0, 130.0, 58.0, COL_FRAME(), "view", 28.0)
-    var bi: Any = addRectT(688.0, 288.0, 136.0, 64.0, COL_INNER(), "view", 29.0)
-    var bgt: Any = addTextT(imgPlaceholder(jstr(ev, "bg"), "背景"), 160.0, 196.0, 14.0, 400, COL_SUB(), "view", true, 30.0)
+    var bo: Any = addRectT(1400.0, 600.0, 260.0, 116.0, COL_FRAME(), "view", 28.0)
+    var bi: Any = addRectT(1376.0, 576.0, 272.0, 128.0, COL_INNER(), "view", 29.0)
+    var bgt: Any = addTextT(imgPlaceholder(jstr(ev, "bg"), "背景"), 320.0, 392.0, 28.0, 400, COL_SOFT(), "view", true, 30.0)
     // 立绘占位框
-    var po: Any = addRectT(160.0, 260.0, 400.0, 78.0, COL_FRAME(), "view", 29.0)
-    var pi: Any = addRectT(148.0, 248.0, 406.0, 84.0, COL_INNER(), "view", 30.0)
-    var prt: Any = addTextT(imgPlaceholder(jstr(ev, "portrait"), "立绘"), 416.0, 196.0, 13.0, 400, COL_SUB(), "view", true, 31.0)
+    var po: Any = addRectT(320.0, 520.0, 800.0, 156.0, COL_FRAME(), "view", 29.0)
+    var pi: Any = addRectT(296.0, 496.0, 812.0, 168.0, COL_INNER(), "view", 30.0)
+    var prt: Any = addTextT(imgPlaceholder(jstr(ev, "portrait"), "立绘"), 832.0, 392.0, 26.0, 400, COL_SOFT(), "view", true, 31.0)
     // 标题
-    var tt: Any = addTextT(jstr(ev, "title"), 140.0, 368.0, 15.0, 700, COL_SOFT(), "view", true, 28.0)
+    var tt: Any = addTextT(jstr(ev, "title"), 280.0, 760.0, 30.0, 700, COL_SOFT(), "view", true, 28.0)
     // 对话框：逐行（step 推进）
-    var db: Any = addRectT(800.0, 84.0, 80.0, 396.0, "#101820", "view", 28.0)
-    var lt: Any = addTextT(lineTextOf(jk(ev, "lines"), step), 104.0, 418.0, 16.0, 400, COL_SOFT(), "view", true, 30.0)
-    var ht: Any = addTextT(lineHint(step, arrLen(jk(ev, "lines"))), 104.0, 452.0, 12.0, 400, COL_SUB(), "view", true, 30.0)
+    var db: Any = addRoundRect(1600.0, 168.0, 160.0, 792.0, COL_CARD(), "view", 28.0, 28.0)
+    var lt: Any = addTextT(lineTextOf(jk(ev, "lines"), step), 208.0, 852.0, 32.0, 400, COL_SOFT(), "view", true, 30.0)
+    var ht: Any = addTextT(lineHint(step, arrLen(jk(ev, "lines"))), 208.0, 928.0, 24.0, 400, COL_SOFT(), "view", true, 30.0)
     null
 }
 fun imgPlaceholder(path: Str, kind: Str): Str =
@@ -83,19 +90,19 @@ fun lineHint(step: Nat, cnt: Nat): Str =
 @impure
 fun renderSuper(m: Json, ev: Json, step: Nat): Null {
     bgmHookOf(jstr(ev, "bgm"))
-    var bk: Any = addRectT(960.0, 540.0, 0.0, 0.0, COL_BLACK(), "view", 50.0)
-    var tt: Any = addTextT(jstr(ev, "title"), 140.0, 150.0, 20.0, 700, COL_SOFT(), "view", true, 50.0)
-    var lt: Any = addTextT(lineTextOf(jk(ev, "lines"), step), 140.0, 240.0, 23.0, 400, COL_SOFT(), "view", true, 50.0)
-    var ht: Any = addTextT(lineHint(step, arrLen(jk(ev, "lines"))), 140.0, 290.0, 13.0, 400, COL_SUB(), "view", true, 50.0)
+    var bk: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_BLACK(), "view", 100.0)
+    var tt: Any = addTextC(jstr(ev, "title"), 960.0, 300.0, 44.0, COL_SOFT(), "view", true, 100.0)
+    var lt: Any = addTextC(lineTextOf(jk(ev, "lines"), step), 960.0, 480.0, 46.0, COL_SOFT(), "view", true, 100.0)
+    var ht: Any = addTextC(lineHint(step, arrLen(jk(ev, "lines"))), 960.0, 600.0, 26.0, COL_SOFT(), "view", true, 100.0)
     null
 }
 
 // ---------- 章末演出（与超事件同构；行来自章节 end.lines 数组） ----------
 @impure
 fun renderChEnd(m: Json, lines: Json, step: Nat): Null {
-    var bk: Any = addRectT(960.0, 540.0, 0.0, 0.0, COL_BLACK(), "view", 50.0)
-    var lt: Any = addTextT(lineTextOf(lines, step), 140.0, 240.0, 23.0, 400, COL_SOFT(), "view", true, 50.0)
-    var ht: Any = addTextT(lineHint(step, arrLen(lines)), 140.0, 290.0, 13.0, 400, COL_SUB(), "view", true, 50.0)
+    var bk: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_BLACK(), "view", 100.0)
+    var lt: Any = addTextT(lineTextOf(lines, step), 280.0, 480.0, 46.0, 400, COL_SOFT(), "view", true, 100.0)
+    var ht: Any = addTextT(lineHint(step, arrLen(lines)), 280.0, 600.0, 26.0, 400, COL_SOFT(), "view", true, 100.0)
     null
 }
 

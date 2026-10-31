@@ -1,42 +1,35 @@
-// main.subl —— 《深谋远虑》主控（foresight = 模组加载器：本体不做内容）
-// 场景链路：mods 烘焙表（mods-data.subl）-> 叙事引擎（engine.subl 六段 tick 循环：
-//   日期推进+资源产出 -> 玩家操作（操作面板 radio 组，行动点 2~4，用完自动结算，可不操作）
-//   -> 事件触发（tick序数/条件/副线，事件/沉浸式/超事件按优先级）-> 玩家处理事件
-//   -> 结算（效果+章末判定+dateJump 演出）-> 下一 tick）+ 地图三地块（entities.blocks 命名/归属）
-//   + 顶栏日期/资源由引擎状态驱动 + 相机缩放/平移/点击选中。
-// 状态串 st2（engine.subl）由本闭包 @mut 持有，各阶段模块级 @impure 函数进出串接。
-// t84 解释器交付前，模组 logic/*.subl 只扫描进清单不执行（mods/README.md）。
+// main.subl —— 主场景（t89：1920x1080 2x 分辨率 + MD3 风格壳）
+// 世界坐标整体 x2；游戏逻辑（引擎 st2、六段 tick 循环）不变。
+// 地图地块几何 x2 在 mapTableOf 里做（smoke-data 几何字符串标量放大），不改数据文件。
+fun VIEW_W(): Rat = 1920.0
+fun VIEW_H(): Rat = 1080.0
+fun LABEL_Y(): Rat = 972.0
 
-// ---------- 画布与布局 ----------
-fun VIEW_W(): Rat = 960.0
-fun VIEW_H(): Rat = 540.0
-fun LABEL_X(): Rat = 430.0
-
-// ---------- 地图包围盒（世界像素；smoke-data.subl 三地块的极值） ----------
-fun TX0(): Rat = 140.0
-fun TX1(): Rat = 700.0
-fun TY0(): Rat = 90.0
-fun TY1(): Rat = 520.0
+// 地图世界范围（x2）
+fun TX0(): Rat = 280.0
+fun TX1(): Rat = 1400.0
+fun TY0(): Rat = 180.0
+fun TY1(): Rat = 1040.0
 fun INIT_X(): Rat = ((TX0() + TX1()) / 2.0)
 fun INIT_Y(): Rat = ((TY0() + TY1()) / 2.0)
 
-// ---------- 颜色 ----------
-fun COL_BG(): Str = "#101820"
-fun COL_TITLE(): Str = "#F0F4F8"
-fun COL_SUB(): Str = "#8FA3B8"
-fun FILL_SEL(): Str = "#FFC107"
-fun blockHex(i: Nat): Str =
-    if (i == 0) "#4A6FA5"
-    else (if (i == 1) "#6A8E5A" else "#A5785A")
+// MD3 深色 tonal 色板（Surface/Primary/OnSurface/Outline 各级）
+fun COL_BG(): Str = "#0F1113"
+fun COL_SEA(): Str = "#101820"
+fun COL_TITLE(): Str = "#E4E7EA"
+fun COL_SUB(): Str = "#B7BFC8"
+fun COL_PRIMARY(): Str = "#A6C8FF"
+fun FILL_SEL(): Str = "#A6C8FF"
 
-// ---------- 相机（自由缩放；数学与 GameDemo 地图 demo 同构） ----------
-fun CTR_X(): Rat = 480.0
-fun CTR_Y(): Rat = 270.0
+fun CTR_X(): Rat = 960.0
+fun CTR_Y(): Rat = 540.0
 fun ZOOM_MIN(): Rat = 1.0
 fun ZOOM_MAX(): Rat = 4.0
 fun ZOOM_STEP(): Rat = 1.15
-fun PAD(): Rat = 8.0
-fun DRAG_THRESHOLD(): Rat = 8.0
+fun PAD(): Rat = 16.0
+fun DRAG_THRESHOLD(): Rat = 16.0
+fun blockHex(i: Nat): Str =
+    if ((i % 2) == 0) "#31506B" else "#3A4656"
 
 fun visW(viewS: Rat): Rat = (VIEW_W() / viewS)
 fun visH(viewS: Rat): Rat = (VIEW_H() / viewS)
@@ -56,7 +49,7 @@ fun zoomViewYAt(viewS: Rat, viewY: Rat, wa: Rat, ns: Rat): Rat = (wa - ((screenY
 fun panXOf(viewS: Rat, viewX: Rat, dx: Rat): Rat = clampP((viewX - (dx / viewS)), panMinX(viewS), panMaxX(viewS))
 fun panYOf(viewS: Rat, viewY: Rat, dy: Rat): Rat = clampP((viewY - (dy / viewS)), panMinY(viewS), panMaxY(viewS))
 
-// ---------- 通用 UI 组件（fixed 屏幕坐标 + z 分层；顶栏 10-12 / 底栏 10-12 / 面板 20 / 事件层 26-50） ----------
+// ---------- 通用 UI 组件（fixed 屏幕坐标 + z 分层；顶栏 10-12 / 底栏 10-14 / 全屏界面 30 / 事件层 26-100） ----------
 @impure
 fun addRectT(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat): Any {
     unchecked var o = objAdd()
@@ -68,6 +61,37 @@ fun addRectT(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat): Any {
     unchecked objTag(o, tag)
     return o
 }
+// MD3 圆角：rect + 四角 circle 同色拼接（compCircle 为实心圆；r<=0 退化为直角）
+@impure
+fun addRoundRect(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat, r: Rat): Any {
+    var bw: Rat = (w - (r * 2.0))
+    var bh: Rat = (h - (r * 2.0))
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(x, (y + r)))
+    unchecked objUse(o, compRect(bw, bh))
+    unchecked objUse(o, compColorHex(hex))
+    unchecked objUse(o, compFixed())
+    unchecked objUse(o, compZ(z))
+    unchecked objTag(o, tag)
+    if ((r > 0.0) && (bw > 0.0) && (bh > 0.0)) {
+        addCircleT(r, (x + r), (y + r), hex, tag, z)
+        addCircleT(r, (x + w - r), (y + r), hex, tag, z)
+        addCircleT(r, (x + r), (y + h - r), hex, tag, z)
+        addCircleT(r, (x + w - r), (y + h - r), hex, tag, z)
+    } else null
+    return o
+}
+@impure
+fun addCircleT(r: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat): Null {
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(x, y))
+    unchecked objUse(o, compCircle(r))
+    unchecked objUse(o, compColorHex(hex))
+    unchecked objUse(o, compFixed())
+    unchecked objUse(o, compZ(z))
+    unchecked objTag(o, tag)
+    null
+}
 @impure
 fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, hex: Str, tag: Str, fixed: Bool, z: Rat): Any {
     unchecked var o = objAdd()
@@ -78,8 +102,30 @@ fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, hex: Str, tag: Str, fixe
     unchecked objTag(o, tag)
     return o
 }
+// 折行文本（width>0 触发 KAPLAY 原生折行；CJK 图集分桶 + 线性过滤保证锐利）
+@impure
+fun addTextWrap(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, width: Rat, hex: Str, tag: Str, fixed: Bool, z: Rat): Any {
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(x, y))
+    unchecked objUse(o, compText(t, size, w, width, 8.0))
+    unchecked objUse(o, compColorHex(hex))
+    unchecked if (fixed) { objUse(o, compFixed()); objUse(o, compZ(z)) }
+    unchecked objTag(o, tag)
+    return o
+}
+@impure
+fun addTextC(t: Str, cx: Rat, cy: Rat, size: Rat, hex: Str, tag: Str, fixed: Bool, z: Rat): Any {
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(cx, cy))
+    unchecked objUse(o, compText(t, size, 400, 0))
+    unchecked objUse(o, compColorHex(hex))
+    unchecked objUse(o, compAnchor("center"))
+    unchecked if (fixed) { objUse(o, compFixed()); objUse(o, compZ(z)) }
+    unchecked objTag(o, tag)
+    return o
+}
 
-// ---------- 地图表：地块命名/归属来自模组 entities.blocks，几何来自 smoke-data ----------
+// ---------- 地图：地块命名/归属来自模组 entities.blocks，几何 x2 标量放大 ----------
 @impure
 fun blockCount(ent: Json): Nat = arrLen(jk(ent, "blocks"))
 @impure
@@ -87,14 +133,35 @@ fun mapRowsLoop(ent: Json, n: Nat, i: Nat, acc: Str): Str =
     if (i >= n) acc
     else {
         var nm: Str = jstr(arrAt(jk(ent, "blocks"), i), "name")
-        var row: Str = concat(concat(nm, ":"), geomOf(i))
+        var row: Str = concat(concat(nm, ":"), geomScale(geomOf(i)))
         var sep: Str = if (i == 0) "" else "|"
         mapRowsLoop(ent, n, (i + 1), concat(concat(acc, sep), row))
     }
 @impure
 fun mapTableOf(ent: Json): Str = mapRowsLoop(ent, blockCount(ent), 0, "")
+// 几何表整体 x2：「x y,x y;...」按 ';' 分环、',' 分点、' ' 分点内坐标（List 逐项 Optional 扫描）
+@impure
+fun geomScale(t: Str): Str = geomRingScan(strSplit(t, ";"), 0, "")
+@impure
+fun geomRingScan(rings: List[Str], i: Nat, acc: Str): Str =
+    if (!listHas(rings, i)) acc
+    else {
+        var part: Str = geomPtScan(strSplit(strOr(elementAt(rings, i), ""), ","), 0, "")
+        geomRingScan(rings, (i + 1), if (strCmp(acc, "") == 0) part else concat(concat(acc, ";"), part))
+    }
+@impure
+fun geomPtScan(pts: List[Str], i: Nat, acc: Str): Str =
+    if (!listHas(pts, i)) acc
+    else {
+        var parts: List[Str] = strSplit(strOr(elementAt(pts, i), ""), " ")
+        var x: Nat = natOr(parseNat(strOr(elementAt(parts, 0), "0")), 0)
+        var y: Nat = natOr(parseNat(strOr(elementAt(parts, 1), "0")), 0)
+        var made: Str = concat(concat(toStr(x * 2), " "), toStr(y * 2))
+        geomPtScan(pts, (i + 1), if (i == 0) made else concat(concat(acc, ","), made))
+    }
+fun listHas(lst: List[Str], i: Nat): Bool = when (elementAt(lst, i)) { is Some(_) => true; None => false }
 
-// ---------- 渲染 ----------
+// ---------- 渲染：地块（矢量精灵 + 点击高亮） ----------
 @impure
 fun renderBlocksLoop(geo: Any, n: Nat, i: Nat, sel: Int): Null =
     if (i >= n) null
@@ -104,7 +171,6 @@ fun renderBlocksLoop(geo: Any, n: Nat, i: Nat, sel: Int): Null =
         objTag(o, "block")
         renderBlocksLoop(geo, n, (i + 1), sel)
     }
-
 @impure
 fun renderBlocks(geo: Any, n: Nat, sel: Int): Null = renderBlocksLoop(geo, n, 0, sel)
 
@@ -138,12 +204,12 @@ fun runSmoke(): Null {
     var ent: Json = modEnt(m)
     var geo: Any = mapLoad(mapTableOf(ent))
     var n: Nat = mapProvCount(geo)
-    var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_BG())
+    var bg: Any = addRectT(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_SEA(), "ui", 10.0)
     objTag(bg, "ui")
     @mut var sel: Int = -1
     @mut var st: Str = engInit(md, ent)
     buildTopbar(m, st)
-    var label: Any = addTextT("", LABEL_X(), 28.0, 13.0, 400, COL_SUB(), "ui", true, 11.0)
+    var label: Any = addTextC("", 960.0, LABEL_Y(), 26.0, COL_SUB(), "ui", true, 22.0)
     buildBottombar(m)
     @mut var viewS: Rat = 1.0
     @mut var viewX: Rat = INIT_X()
@@ -156,7 +222,8 @@ fun runSmoke(): Null {
     @mut var moved: Bool = false
     renderBlocks(geo, n, -1)
     applyView(viewS, viewX, viewY)
-    // 引擎起步：tick 1（相位1 日期推进+资源产出 -> 相位2 玩家操作阶段自动开操作面板）
+    // 引擎起步：tick 1（相位1 日期推进+资源产出 -> 相位2 玩家操作；队长裁决：进游戏先看地图，
+    // 操作/国策/属性/地块界面由底栏按钮切全屏打开）
     st = engTickStart(m, st)
     onScroll { dy =>
         var f: Rat = if (dy > 0.0) (1.0 / ZOOM_STEP()) else ZOOM_STEP()
@@ -179,13 +246,18 @@ fun runSmoke(): Null {
         pressY = mousePosY()
         lastX = pressX
         lastY = pressY
+        // MD3 状态层：按下底栏按钮即闪覆盖色
+        var b0: Nat = whichBtn(pressX, pressY)
+        if (b0 < BTN_N()) {
+            var fl: Any = addRectT(NAV_W(), NAV_H(), btnX(b0), NAV_Y(), "#444B52", "statelayer", 40.0)
+        } else null
     } }
     onMouseMove { _m => if (pressed) {
         var mx: Rat = mousePosX()
         var my: Rat = mousePosY()
         var dx: Rat = distAbs(mx, pressX)
-        var dy3: Rat = distAbs(my, pressY)
-        if ((!moved) && ((dx > DRAG_THRESHOLD()) || (dy3 > DRAG_THRESHOLD()))) { moved = true }
+        var dy2: Rat = distAbs(my, pressY)
+        if ((!moved) && ((dx > DRAG_THRESHOLD()) || (dy2 > DRAG_THRESHOLD()))) { moved = true }
         if (moved) {
             viewX = panXOf(viewS, viewX, (mx - lastX))
             viewY = panYOf(viewS, viewY, (my - lastY))
@@ -195,6 +267,7 @@ fun runSmoke(): Null {
         lastY = my
     } }
     onMouseRelease("left") { _e => if (pressed) {
+        objsDestroyTag("statelayer")
         if (!moved) {
             var ph: Str = engField(st, F_PHASE())
             if (strCmp(ph, "over") == 0) null
@@ -212,17 +285,23 @@ fun runSmoke(): Null {
                             else { st = renderPanelKind(m, st, kind) }
                         }
                     } else {
-                        var pn: Str = engField(st, F_PANEL())
-                        if (strCmp(pn, "ops") == 0) { st = opsPanelHit(m, st, pressX, pressY) }
-                        else {
-                            if (strCmp(pn, "policy") == 0) { st = policyPanelHit(m, st, pressX, pressY) }
-                            else { if (strCmp(pn, "none") == 0) { sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY)) } else null }
+                        if ((strCmp(engField(st, F_PANEL()), "none") != 0) && panelBackHit(pressX, pressY)) {
+                            objsDestroyTag("panel")
+                            st = engSet(st, F_PANEL(), "none")
+                        } else {
+                            var pn: Str = engField(st, F_PANEL())
+                            if (strCmp(pn, "ops") == 0) { st = opsPanelHit(m, st, pressX, pressY) }
+                            else {
+                                if (strCmp(pn, "policy") == 0) { st = policyPanelHit(m, st, pressX, pressY) }
+                                else { if (strCmp(pn, "none") == 0) { sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY)) } else null }
+                            }
                         }
                     }
                 }
             }
         }
         pressed = false
+        buildNav(m, engField(st, F_PANEL()))
     } }
     null
 }
@@ -230,7 +309,7 @@ fun runSmoke(): Null {
 @impure
 fun main(): Null {
     var lb: Bool = winWidth() >= winHeight()
-    gameStartFit(960, 540, lb, false)
+    gameStartFit(1920, 1080, lb, false)
     sceneAdd("main") { _e => runSmoke() }
     sceneGo("main")
     null

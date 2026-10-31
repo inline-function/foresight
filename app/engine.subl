@@ -321,11 +321,10 @@ fun engTickStart(m: Json, s: Str): Str {
     st = engSet(st, F_SEL(), "|")
     st = engSet(st, F_PAGE(), "L")
     st = engSet(st, F_PHASE(), "ops")
-    st = engSet(st, F_PANEL(), "ops")
+    st = engSet(st, F_PANEL(), "none")
     objsDestroyTag("panel")
     objsDestroyTag("view")
     refreshTopbar(m, st)
-    renderOpsMain(m, st)
     return st
 }
 

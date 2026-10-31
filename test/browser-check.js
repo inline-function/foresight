@@ -48,8 +48,8 @@ async function main() {
   while ((Date.now() - start) < 9000) { await sleep(1000); }
   // 画布 CSS 包围盒 + letterbox 变换（世界 960x540 居中缩放进画布）
   var rectExpr = "(function () { var cv = document.querySelector('canvas'); if (!cv) return null; var r = cv.getBoundingClientRect();" +
-    "var s = Math.min(r.width / 960, r.height / 540);" +
-    "return JSON.stringify({x: r.x + (r.width - 960 * s) / 2, y: r.y + (r.height - 540 * s) / 2, s: s}); })()";
+    "var s = Math.min(r.width / 1920, r.height / 1080);" +
+    "return JSON.stringify({x: r.x + (r.width - 1920 * s) / 2, y: r.y + (r.height - 1080 * s) / 2, s: s}); })()";
   var rect = null;
   try { var rr = await evaluate(rectExpr); rect = rr && rr.result && JSON.parse(rr.result.value); } catch (e7) { rect = null; }
   if (!rect) { console.log('CDP-FAIL 无 canvas 包围盒'); try { child.kill(); } catch (e8) {} process.exit(1); }
@@ -64,11 +64,11 @@ async function main() {
   var probeExpr = "(function () { var cv = document.querySelector('canvas'); if (!cv) return 'NO-CANVAS';" +
     "if (!window.__subl || typeof window.__subl.main !== 'function') return 'NO-SUBL';" +
     "var gl = cv.getContext('webgl2') || cv.getContext('webgl'); if (!gl) return 'NO-GL';" +
-    "function px(lx, ly) { var s = Math.min(cv.width / 960, cv.height / 540);" +
-    "  var x = Math.round(((cv.width - 960 * s) / 2) + lx * s), y = Math.round(((cv.height - 540 * s) / 2) + ly * s);" +
+    "function px(lx, ly) { var s = Math.min(cv.width / 1920, cv.height / 1080);" +
+    "  var x = Math.round(((cv.width - 1920 * s) / 2) + lx * s), y = Math.round(((cv.height - 1080 * s) / 2) + ly * s);" +
     "  var p = new Uint8Array(4); gl.readPixels(x, cv.height - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p); return [p[0], p[1], p[2]]; }" +
     "return JSON.stringify({ topbar: px(200, 10), bottombar: px(200, 520), sea: px(200, 300), block2: px(620, 145)," +
-    "  panel: px(300, 200), center: px(480, 270) }); })()";
+    "  panel: px(960, 520), center: px(960, 540) }); })()";
   async function probe(tag) {
     var res = null;
     try { var r2 = await evaluate(probeExpr); res = r2 && r2.result && r2.result.value; } catch (e4) { res = 'EVAL-ERR'; }
@@ -77,8 +77,9 @@ async function main() {
   }
   // lieyan 模组（活动模组）：序章操作页 -> 签署应急预案（AP 1->0 自动结算）-> 序章超事件
   await probe('ops-panel');
-  await click(300, 170);  // 序章操作页「应急预案」
-  await click(300, 170);  // 签署《疫情防控应急预案》-> 行动点 0 -> 自动结算 -> 超事件（全屏黑底 z=50）
+  await click(240, 1044); // 底栏 MD3 导航「操作」-> 全屏操作界面（队长裁决：进游戏先看地图）
+  await click(960, 200);  // 操作页「应急预案」
+  await click(960, 200);  // 签署《疫情防控应急预案》-> 行动点 0 -> 自动结算 -> 超事件（全屏黑底 z=100）
   var p2 = await probe('super-event');
   var blackOk = false;
   try {

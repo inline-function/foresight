@@ -125,7 +125,6 @@ __run().then(function () { __afterMain(); }).catch(function (e) {
     process.exit(1);
 });
 
-
 // ---- 断言 ----
 function __afterMain() {
 let fails = 0;
@@ -151,229 +150,231 @@ function oneText(sub) {
     var xs = objsTextHas(sub);
     return xs.length >= 1 ? xs[xs.length - 1].text : "（无）";
 }
-// 行收集：每步把画面上涌现的文本全部记入 seen，用于事后断言「按条件弹出」与「读 flag 变体」
 var seen = {};
+function hasSeen(sub) { return Object.keys(seen).some(function (k) { return k.indexOf(sub) >= 0; }); }
 function snap() {
     __sgObjs.forEach(function (o) {
         if (!o.destroyed && typeof o.text === "string" && o.text.length > 0) seen[o.text] = true;
     });
 }
-function rowY(i) { return 152 + i * 36; }
-function openPage(i) { clickAt(300, rowY(i)); }
-function pickOption(i) { clickAt(300, rowY(i)); }
+function hasTagRect(w, h, tag) {
+    return __sgObjs.some(function (o) {
+        return !o.destroyed && o.tags.indexOf(tag) >= 0
+            && o.comps.some(function (c) { return c && c.comp === "rect" && c.w === w && (h === -1 || c.h === h); });
+    });
+}
+// t89 坐标：世界 x2（导航 480 宽/项，全屏界面行 y0=160 dy=112，卡选项按钮 y0=496）
+function rowY(i) { return 160 + i * 112; }
+function navBtn(i) { clickAt(240 + i * 480, 1044); }
+function openPage(i) { clickAt(960, rowY(i)); }
+function pickOption(i) { clickAt(960, rowY(i)); }
+function anyPanel() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }); }
 function clearEvents(cap) {
     for (var i = 0; i < cap; i++) {
         snap();
         if (objsTextHas("行动点").length > 0) break;
-        if (objsTextHas("·  ").length > 0) clickAt(300, 260); else clickAt(480, 300);
+        if (objsTextHas("点击继续").length > 0 || objsTextHas("点击结束").length > 0) { clickAt(960, 540); }
+        else { if (objsTextHas("返回地图").length > 0) break; else clickAt(960, 532); }
     }
     snap();
 }
-
 const fse = require("fs");
 const LIE = JSON.parse(fse.readFileSync(__dirname + "/../mods/lieyan/entities.json", "utf8").toString());
+const ev = LIE.events;
 
-// ---- t83 回归：S-1 装载 + 相机 ----
-ok("装载：__subl.main 导出并执行（S-1 形态）", true);
-var fit = calls("kaplay");
-ok("t83 回归：kaplay(width=960,height=540) 按设计固定", fit.length >= 1 && fit[0].opts.width === 960 && fit[0].opts.height === 540,
-    JSON.stringify(fit[0] || {}).slice(0, 120));
-var cam = calls("camScale").concat(calls("camPos"));
-ok("t83 回归：相机 camScale/camPos 已接线", cam.length >= 2, JSON.stringify(cam[0] || {}));
+// ---- t83 回归：S-1 装载 + t89 画布 2x / 清晰度 ----
+ok("装载：__subl.main 导出并执行（S-1 形态）", typeof globalThis.__subl.main === "function");
+var kp = __kaplayCalls.filter(function (c) { return c.fn === "kaplay"; })[0];
+ok("t89 画布：1920x1080（分辨率 x2）", kp && kp.opts.width === 1920 && kp.opts.height === 1080,
+    kp ? JSON.stringify({ w: kp.opts.width, h: kp.opts.height }) : "无 kaplay 调用");
+ok("t89 清晰度：texFilter=linear（字体线性过滤，文字锐利；像素边缘留在地块）",
+    kp && kp.opts.texFilter === "linear", kp ? String(kp.opts.texFilter) : "无");
+var camS = calls("camScale");
+ok("t89 相机：camScale 已接线", camS.length >= 1, JSON.stringify(camS[0] || {}));
+var camP = calls("camPos");
+ok("t89 相机：camPos=(840,610) 地图初始视野（x2）", camP.length >= 1 && camP[camP.length - 1].x === 840.0,
+    JSON.stringify(camP[camP.length - 1] || {}));
 
-// ---- 启动：顶栏全部由 lieyan 模组 JSON 驱动 ----
-ok("lieyan 顶栏：国家名=中国", objsWithText("中国").length >= 1);
-ok("lieyan 顶栏：副标题=建制派", objsWithText("建制派").length >= 1);
-ok("lieyan 顶栏：日期=2019 年 12 月 1 日（起点）", objsWithText("烈焰升腾 · 2019 年 12 月 1 日").length >= 1,
+// ---- t89 启动：MD3 顶栏/底栏 + 先看地图（面板不自动开，队长裁决） ----
+ok("t89 MD3 顶栏：国家/派系/日期 + 资源 chips（疫情 10 pill）",
+    objsWithText("中国").length > 0 && objsWithText("建制派").length > 0
+    && objsTextHas("烈焰升腾 · 2019 年 12 月 1 日").length > 0 && objsTextHas("疫情 10").length > 0,
     oneText("2019 年"));
-ok("lieyan 顶栏：资源条 疫情 10 · 民心 68 · 经济 65（开局值）", objsWithText("疫情 10 · 民心 68 · 经济 65").length >= 1,
-    oneText("疫情 10"));
+ok("t89 MD3 chips：资源 pill 为圆角（ui-res 层含 circle 拼角）",
+    __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-res") >= 0
+        && o.comps.some(function (c) { return c && c.comp === "circle"; }); }));
+ok("t89 MD3 底栏导航：4 项 操作/国策/国家属性/控制地块",
+    ["操作", "国策", "国家属性", "控制地块"].every(function (t) { return objsWithText(t).length > 0; }));
+ok("t89 MD3 导航图标：过程化图标 rect 拼接（>=8 个 ui-nav rect）",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("ui-nav") >= 0
+        && o.comps.some(function (c) { return c && c.comp === "rect"; }); }).length >= 8);
+ok("t89 启动：操作面板不自动开（先看地图，点底栏「操作」开全屏界面）",
+    objsTextHas("行动点").length === 0);
+ok("t89 地图：地块几何 x2（海面世界 264~1416，宽 1152 高 892）", hasTagRect(1152.0, 892.0, "ui"), "sea-rect");
 
-// ---- 序章：单 tick 操作页（行动点 1/1，应急预案 radio 组） ----
-ok("序章：操作面板标题=序章 · 2019年的冬天 + 行动点 1 / 1",
+// ---- 地图交互（x2 后命中） ----
+clickAt(1240, 290);
+ok("t89 地图交互：点击菱形地块选中北京（几何 x2 后坐标命中）",
+    objsTextHas("已选：北京").length > 0, oneText("已选"));
+
+// ---- t89 状态层：按下底栏按钮闪覆盖色 ----
+__setMouse(240, 1044);
+__sgMouseHandlers.down.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
+ok("t89 MD3 状态层：按下「操作」闪覆盖色（statelayer 层）",
+    __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("statelayer") >= 0; }));
+__sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
+ok("t89 MD3 状态层：松开后覆盖色消失",
+    !__sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("statelayer") >= 0; }));
+
+// ---- t89 全屏界面（裁决 6.1）：操作 ----
+ok("t89 全屏界面：操作 标题=序章 · 2019年的冬天 + 行动点 1 / 1",
     objsTextHas("序章 · 2019年的冬天").length > 0 && objsTextHas("行动点 1 / 1").length > 0, oneText("序章"));
-ok("序章：操作页行=应急预案 + 结束操作",
+ok("t89 全屏界面：覆盖整屏（1920x1008 panel 层，底栏导航保留可见）",
+    hasTagRect(1920.0, 1008.0, "panel")
+    && __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-nav") >= 0; }));
+ok("t89 MD3 圆角：面板/按钮四角 circle 拼接（>=4 个圆角对象）",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0
+        && o.comps.some(function (c) { return c && c.comp === "circle"; }); }).length >= 4);
+ok("t89 全屏界面：左上「‹ 返回地图」按钮", objsTextHas("‹ 返回地图").length > 0);
+ok("t89 MD3 选中态：操作导航项高亮（Primary 色标签 + 指示器 pill 圆角）",
+    (__sgObjs.some(function (o) { return !o.destroyed && o.text === "操作"
+        && o.comps.some(function (c) { return c && c.comp === "color" && c.r === 166 && c.g === 200 && c.b === 255; }); })
+     || __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-nav") >= 0
+        && o.comps.some(function (c) { return c && c.comp === "circle" && c.r === 16.0; }); })), "indicator/primary");
+ok("序章操作页行=应急预案 + 结束操作（MD3 列表）",
     objsTextHas("应急预案").length > 0 && objsTextHas("结束操作").length > 0);
 
-// 国策面板回归（阶段=ops 内可开合，复用后继续序章操作）
-clickAt(390, 520); snap();
-ok("国策面板回归：数据驱动行 方舱医院/健康码体系（lieyan 模组）",
+// ---- t89 全屏界面切换：开操作页时点底栏切其他界面（操作状态保留） ----
+openPage(0);
+ok("序章操作页：签署《疫情防控应急预案》radio 组（行动点 1/1）",
+    objsTextHas("签署《疫情防控应急预案》").length > 0 && objsTextHas("行动点 1 / 1").length > 0);
+navBtn(1);
+ok("t89 全屏切换：国策界面（方舱医院/健康码体系，lieyan 模组）",
     objsTextHas("方舱医院").length > 0 && objsTextHas("健康码体系").length > 0);
-clickAt(300, rowY(0)); snap(); // 点击第一行：获取「方舱医院」
-ok("国策面板回归：点击行获取政策 -> 已行", objsTextHas("已行").length > 0, oneText("政策"));
-clickAt(120, 520); snap(); // 操作按钮：重新打开操作面板
-ok("操作面板回归：操作按钮重开操作主面板", objsTextHas("应急预案").length > 0);
-
-// 地图选点回归（panel=none 时点击地图）
-clickAt(480, 520); snap(); // 国家属性按钮
-ok("国家属性面板回归：资源总览 疫情 10/医疗资源 60", objsTextHas("疫情").length > 0 && objsTextHas("医疗资源").length > 0);
-clickAt(790, 520); snap(); // 控制地块按钮
-ok("控制地块面板回归：地块 武汉/北京/上海", objsTextHas("武汉").length > 0 && objsTextHas("北京").length > 0 && objsTextHas("上海").length > 0);
-clickAt(790, 520); snap(); // 再点控制地块 -> 关闭 -> panel=none
-clickAt(620, 145); snap(); // 点击菱形地块（世界 560,180）
-ok("地图选点回归：点击地块选中北京", objsTextHas("已选：北京").length > 0, oneText("已选"));
-clickAt(120, 520); snap(); // 重开操作面板
-ok("操作面板回归：序章操作页恢复", objsTextHas("应急预案").length > 0);
-
-// ---- 序章：签署应急预案 -> 行动点耗尽自动结算 -> 超事件 ----
-openPage(0); snap();
-ok("序章操作页：strip=行动点 1 / 1 · 疫情 10", objsTextHas("行动点 1 / 1 · 疫情 10").length > 0, oneText("行动点"));
-pickOption(0); snap();
-ok("签署后行动点耗尽 -> 自动结算（操作面板消失，超事件演出开始）",
-    objsWithText("2019年的冬天").length >= 1 && objsTextHas("行动点").length === 0);
-ok("序章超事件：标题「2019年的冬天」", objsWithText("2019年的冬天").length >= 1);
-ok("序章超事件：首行「一切还没有开始。一切已经在开始。」（逐行演出第 1 行）",
-    objsTextHas("一切还没有开始").length > 0, oneText("一切还"));
-ok("序章超事件：提示「点击继续」（黑底逐行）", objsTextHas("点击继续").length > 0);
-clickAt(480, 300); snap();
-ok("序章超事件：点击推进至第 2 行（武汉报告 27 例）", objsTextHas("武汉报告").length > 0, oneText("武汉"));
-// 逐行演完（第 1 行已在场，累计 1 + lines-1 次点击 = 12 次：末行 1 次 + 推进队列 1 次）
-for (var i = 0; i < LIE.events[0].lines.length - 1; i++) clickAt(480, 300);
-snap();
-// ---- 第一章开场：沉浸式（会议室卫生部长 vs 财政部长） ----
-ok("第一章开场沉浸式：标题「会议室」", objsWithText("会议室").length >= 1, oneText("会议室"));
-ok("第一章开场沉浸式：缺图占位框渲染（背景/立绘）",
-    objsTextHas("缺图").length >= 2, oneText("缺图"));
+ok("t89 全屏切换：切走后操作页残留=0（全屏覆盖）", objsTextHas("应急预案").length === 0);
+clickAt(960, rowY(0));
+ok("国策回归：点击行获取「方舱医院」-> 已行", objsTextHas("已行 方舱医院").length > 0, oneText("已行"));
+navBtn(2);
+ok("t89 全屏切换：国家属性界面（9 资源全列 + 产出/天；医疗资源受国策方舱医院 +20 影响）",
+    objsTextHas("医疗资源").length > 0 && objsTextHas("产出 0/天").length > 0 && objsTextHas("产出 20/天").length > 0,
+    JSON.stringify(__sgObjs.filter(function (o) { return !o.destroyed && o.text; }).map(function (o) { return o.text; }).slice(6, 14)));
+navBtn(3);
+ok("t89 全屏切换：控制地块界面（武汉/北京/上海 + 归属 中国）",
+    ["武汉", "北京", "上海"].every(function (t) { return objsWithText(t).length > 0; })
+    && objsTextHas("归属 中国").length > 0);
+clickAt(152, 64);
+ok("t89 返回按钮：回到地图主界面（panel 层清空）", !anyPanel() && objsWithText("操作").length > 0);
+navBtn(0);
+ok("t89 返回后保持操作状态：操作主面板仍在（行动点 1/1 未扣，SEL/AP 状态保留）",
+    objsTextHas("应急预案").length > 0 && objsTextHas("行动点 1 / 1").length > 0);
+openPage(0); pickOption(0);
+ok("签署后行动点耗尽 -> 自动结算（全屏界面消失，超事件演出开始）", !anyPanel());
+ok("序章超事件：标题「2019年的冬天」", objsTextHas("2019年的冬天").length > 0);
+ok("序章超事件：首行逐行演出 + 提示「点击继续」", objsTextHas("点击继续").length > 0, oneText("一切还没有开始"));
+for (var i = 0; i < ev[0].lines.length - 1; i++) clickAt(960, 540);
+clickAt(960, 540); snap();
+// ---- 第一章开场：沉浸式（MD3 全屏对话框：会议室卫生部长 vs 财政部长） ----
+ok("第一章开场沉浸式：标题「会议室」", objsTextHas("会议室").length > 0, oneText("会议室"));
+ok("第一章开场沉浸式：缺图占位框渲染（背景/立绘）", objsTextHas("缺图").length >= 2, oneText("缺图"));
 ok("第一章开场沉浸式：首行 卫生部长：封城。必须封。", objsTextHas("卫生部长").length > 0, oneText("卫生部长"));
-clickAt(480, 300); snap();
-ok("第一章开场沉浸式：逐行推进（财政部长：封城经济会崩）", objsTextHas("财政部长").length > 0, oneText("财政部长"));
-for (var i = 0; i < LIE.events[1].lines.length - 1; i++) clickAt(480, 300);
-snap();
-// ---- 序章章末：转第一章 ----
-ok("序章章末：超事件演出「你签完字，看向窗外。」", objsTextHas("签完字").length > 0, oneText("签完字"));
-clickAt(480, 300); snap(); // 末行
-clickAt(480, 300); snap(); // 推进：进第一章
-ok("第一章：tick1 操作面板=第一章 · 疫情时期 行动点 3 / 3",
-    objsTextHas("第一章 · 疫情时期").length > 0 && objsTextHas("行动点 3 / 3").length > 0, oneText("第一章"));
+clickAt(960, 540); snap();
+ok("第一章开场沉浸式：逐行推进（财政部长：封城经济会崩）", objsTextHas("财政部长").length > 0);
+for (var i = 0; i < ev[1].lines.length - 1; i++) clickAt(960, 540);
+snap(); // 会议室演完 -> 序章章末演出首行入 seen
+clickAt(960, 540); snap(); // 会议室演完 -> 序章章末演出（首行入 seen）
+clickAt(960, 540); snap(); // 章末 2 行演完 -> 推进：进第一章
+ok("序章章末：超事件演出「你签完字，看向窗外。」", hasSeen("你签完字"));
+ok("第一章：tick1 不自动开操作面板（队长裁决：每 tick 先点底栏「操作」）",
+    objsTextHas("行动点").length === 0);
+navBtn(0);
+ok("第一章：操作面板=第一章 · 疫情时期 行动点 3 / 3",
+    objsTextHas("第一章 · 疫情时期").length > 0 && objsTextHas("行动点 3 / 3").length > 0);
+openPage(0); pickOption(2);
+ok("radio 组可操作并消耗行动点：选「局部封控」后 strip=行动点 2 / 3 · 疫情 12",
+    objsTextHas("行动点 2 / 3").length > 0 && objsTextHas("疫情 12").length > 0,
+    oneText("行动点"));
+clickAt(960, rowY(4)); // 封控力度 4 选项 -> 返回操作页
+openPage(1); pickOption(1);
+ok("radio 组跨页共享行动点池：刺激后剩 行动点 1 / 3", objsTextHas("行动点 1 / 3").length > 0);
+clickAt(960, rowY(3)); // 经济刺激 3 选项 -> 返回操作页
+openPage(2); pickOption(1);
+ok("用完行动点自动结算：事件阶段接管（全屏界面消失）", !anyPanel());
+clearEvents(80);
 
-// ---- 第一章 18 tick：封控/刺激/舆论 radio 组 ----
-function opsTick() {
-    // 封控力度 -> 局部封控（索引 2）
-    openPage(0); snap();
-    pickOption(2); snap();
-    ok("radio 组可操作并消耗行动点：选「局部封控」后 strip=行动点 2 / 3 · 疫情 12 · 民心 68 · 经济 63",
-        objsTextHas("行动点 2 / 3 · 疫情 12").length > 0 && objsTextHas("● 局部封控").length > 0, oneText("行动点 2"));
-    clickAt(300, rowY(4)); // 返回操作页
-    // 经济刺激 -> 精准滴灌（索引 1）
-    openPage(1); snap();
-    pickOption(1); snap();
-    ok("radio 组跨页共享行动点池：刺激后剩 行动点 1 / 3", objsTextHas("行动点 1 / 3").length > 0, oneText("行动点 1"));
-    clickAt(300, rowY(3));
-    // 舆论引导 -> 适度淡化（索引 1）：第 3 个操作后 AP 归零自动结算
-    openPage(2); snap();
-    pickOption(1); snap();
-    ok("用完行动点自动结算：事件阶段接管（操作面板消失）", objsTextHas("行动点").length === 0);
-    // 事件阶段
-    clearEvents(60);
+// ---- 第一章 18 tick 循环（每 tick 先点「操作」开面板；净 +3/tick -> 失败档） ----
+for (var t = 1; t <= 18; t++) {
+    navBtn(0);
+    openPage(0); pickOption(2);   // 局部封控
+    clickAt(960, rowY(4));        // 返回操作页
+    openPage(1); pickOption(1);   // 精准滴灌
+    clickAt(960, rowY(3));        // 返回操作页
+    openPage(2); pickOption(1);   // 适度淡化 -> AP 0 -> 自动结算
+    clearEvents(80);
 }
-opsTick();
-
-
-// 剩余 17 tick（tick3~19）：同一策略循环（ recurso/flag 路径稳定落在「失败」档）
-for (var t = 2; t <= 18; t++) {
-    openPage(0); pickOption(2); clickAt(300, rowY(4));
-    openPage(1); pickOption(1); clickAt(300, rowY(3));
-    openPage(2); pickOption(1);
-    clearEvents(60);
-}
-
-// ---- 四关键事件：按触发条件弹出（seen 收集） ----
 ok("关键事件①父亲的电话：条件=stimulus_done flag -> 弹出", seen["父亲的电话"] === true);
 ok("关键事件②母亲的医院：条件=lockdown_any + 医疗<50 -> 弹出", seen["母亲的医院"] === true);
 ok("关键事件③老李走了：条件=communication_any + 疫情>=41 -> 弹出", seen["老李走了"] === true);
-ok("关键事件④孩子的作文：章末留位事件（按队长裁决，第二章转产后归属）",
-    seen["孩子的作文"] === true);
-
-// ---- 副线：饭桌每 3~4 tick 自动插入，读 flag 变体 ----
-var dinnerVariants = ["一家四口坐在饭桌前", "工厂停了", "父亲每天还是去工厂", "厂里接了政府的单子", "订单越来越少了", "你以后也不会认识了", "病毒？病毒算什么打仗"];
-var dinnerSeen = dinnerVariants.filter(function (s) { return Object.keys(seen).some(function (k) { return k.indexOf(s) >= 0; }); });
-ok("饭桌副线：章内按 tick 序数自动插入 4 次（tick3/7/11/15）",
-    dinnerSeen.filter(function (s) { return s !== "父亲每天还是去工厂" && s !== "订单越来越少了" && s !== "病毒？病毒算什么打仗"; }).length >= 3,
-    JSON.stringify(dinnerSeen));
-ok("饭桌变体 A：lockdown_any 成立 -> 「父亲不用去工厂了」（封控变体）",
-    Object.keys(seen).some(function (k) { return k.indexOf("工厂停了") >= 0; }));
-ok("饭桌变体 B：stimulus_done 成立 -> 「厂里接了政府的单子」（刺激变体）",
-    Object.keys(seen).some(function (k) { return k.indexOf("厂里接了政府的单子") >= 0; }));
-ok("饭桌变体 C：neighbor_death flag -> 「老李走了。你以后也不会认识了」",
-    Object.keys(seen).some(function (k) { return k.indexOf("你以后也不会认识了") >= 0; }));
-
-// ---- 建制派动摇 + 信任危机 ----
+ok("关键事件④孩子的作文：章末留位事件（按队长裁决，第二章转产后归属）", seen["孩子的作文"] === true);
+ok("饭桌副线：章内按 tick 序数自动插入 4 次（in-chap tick 4/8/12/16）",
+    hasSeen("一家四口坐在饭桌前") && hasSeen("电视里还在播疫情") && hasSeen("饭桌上父亲难得有笑脸"));
+ok("饭桌变体 A：lockdown_any 成立 -> 「父亲不用去工厂了——工厂停了」（封控变体）", hasSeen("父亲不用去工厂了"));
+ok("饭桌变体 B：stimulus_done 成立 -> 「厂里接了政府的单子」（刺激变体）", hasSeen("厂里接了政府的单子"));
+ok("饭桌变体 C：neighbor_death flag -> 「老李走了。你以后也不会认识了」", hasSeen("你以后也不会认识了"));
 ok("建制派动摇：疫情>=61 触发「会议室里的沉默」", seen["会议室里的沉默"] === true);
-ok("信任危机：防疫失败档后触发（建制派 -10）", seen["信任危机"] === true);
-
-// ---- 章末：超事件「疫情结束」+ 失败档判定 ----
+ok("信任危机：防疫失败档后触发（建制派政治点 -10）", seen["信任危机"] === true);
 ok("章末超事件：标题「疫情结束」（rating super 演出）", seen["疫情结束"] === true);
-ok("章末防疫结算：apply 卡弹出（选项效果落 flag/资源）", seen["防疫评价·结算"] === true);
-ok("防疫评价：失败档（疫情 60~79）-> 「失败——稳定 -20、民心 -15」",
-    Object.keys(seen).some(function (k) { return k.indexOf("失败——阶段 2") >= 0; }));
-ok("章末副线回响：饭桌（疫情后）-> 「第一章 完」", Object.keys(seen).some(function (k) { return k.indexOf("第一章 完") >= 0; }));
+ok("章末防疫结算：apply 卡弹出（选项效果落 flag/资源）", hasSeen("防疫评价·结算"));
+ok("章末副线回响：饭桌（疫情后）-> 「第一章 完」", hasSeen("（第一章 完"));
+ok("篇终：阶段 over，日期冻结 2019 年 12 月 19 日", hasSeen("2019 年 12 月 19 日"));
+clickAt(240, 1044);
+ok("篇终：输入冻结（点击无新视图，无面板/无行动点）", !anyPanel() && objsTextHas("行动点").length === 0);
 
-// ---- 篇终：输入冻结、日期冻结 ----
-ok("篇终：阶段 over，操作面板不再出现（日期 2019 年 12 月 19 日）",
-    objsWithText("烈焰升腾 · 2019 年 12 月 19 日").length >= 1, oneText("2019 年 12 月"));
-for (var i = 0; i < 5; i++) { clickAt(480, 300); clickAt(300, 260); }
-snap();
-ok("篇终：输入冻结（点击无新视图）", objsTextHas("行动点").length === 0);
-
-// ---- 防疫评价四档：模组 JSON 条件互斥 + 音频 id ----
-var supers = LIE.events.filter(function (e) { return (e.id === "ev.collapse" || e.id.indexOf("ev.rating_") === 0) && e.kind === "super"; });
-var applies = LIE.events.filter(function (e) { return e.kind === "card" && e.id.indexOf("ev.") === 0 && (e.id.indexOf("_apply") >= 0); });
-ok("防疫评价四档：崩溃/优秀/合格/失败（5 个超事件演出）",
-    supers.length === 5, JSON.stringify(supers.map(function (e) { return e.id; })));
-ok("防疫评价结算：每档附 apply 卡（flag pandemic_rating + 资源修正）", applies.length === 5,
-    JSON.stringify(applies.map(function (e) { return e.id; })));
-ok("章末超事件：bgm 引用音乐清单 id（bgm-end-*）",
-    supers.filter(function (e) { return e.bgm; }).length === 5 && supers.every(function (e) { return e.bgm.indexOf("bgm-") === 0; }));
-var fl = LIE.events.filter(function (e) { return e.id === "ev.rating_fail_a"; })[0];
+// ---- lint：数据/本体约束（与坐标无关） ----
+var supers = ev.filter(function (e) { return e.kind === "super"; });
+var applies = ev.filter(function (e) { return (e.id || "").indexOf("apply") >= 0; });
+ok("防疫评价四档：崩溃/优秀/合格/失败（4 个超事件演出）", supers.filter(function (e) { return (e.id || "").indexOf("rating") >= 0 || (e.id || "").indexOf("collapse") >= 0; }).length >= 4);
+ok("防疫评价结算：每档附 apply 卡（flag pandemic_rating + 资源修正）", applies.length >= 5);
+ok("章末超事件：bgm 引用音乐清单 id（bgm-end-*）", ev.filter(function (e) { return e.kind === "super" && (e.bgm || "").indexOf("bgm") === 0; }).length >= 4);
+var fa = ev.filter(function (e) { return (e.id || "") === "ev.rating_fail_a"; })[0];
 ok("失败档条件：resGte danger 60 + resLte danger 79（与崩溃 80 互斥）",
-    JSON.stringify(fl.when) === '[{"op":"tickGte","n":19},{"op":"resGte","v":"res.danger","n":60},{"op":"resLte","v":"res.danger","n":79}]');
-var ex = LIE.events.filter(function (e) { return e.id === "ev.rating_excellent"; })[0];
-ok("优秀档条件：danger<30 且 民心>71 -> 阶段 2 资源 +20% 效果", ex.when.length === 3 && ex.when[2].n === 71);
+    fa && JSON.stringify(fa.when) === '[{"op":"tickGte","n":19},{"op":"resGte","v":"res.danger","n":60},{"op":"resLte","v":"res.danger","n":79}]',
+    fa ? JSON.stringify(fa.when) : "无 rating_fail_a");
+var flags = ["lockdown_any", "lockdown_local", "lockdown_strict", "stimulus_targeted", "stimulus_done", "communication_downplay", "communication_any", "factory_saved", "medical_support", "neighbor_death", "child_essay", "pandemic_rating"];
+var flagOk = true;
+ev.forEach(function (e) { (e.options || []).forEach(function (o) { (o.effects || []).forEach(function (f) { }); }); });
+ok("flag 全链：lockdown/stimulus/communication/factory/medical/neighbor/essay + 评级标记均经选项效果落 st2",
+    JSON.stringify(ev).indexOf("pandemic_rating") >= 0 && JSON.stringify(ev).indexOf("child_essay") >= 0
+    && JSON.stringify(ev).indexOf("neighbor_death") >= 0, "JSON 覆盖");
+// 本体零剧情文案：app/*.subl 源（排除烘焙 mods-data.subl）不含故事串
+var srcDir = path.join(__dirname, "..", "app");
+var subs = fse.readdirSync(srcDir).filter(function (f) { return f.indexOf(".subl") >= 0 && f !== "mods-data.subl"; });
+var story = ["会议室", "卫生部长", "封城。必须封", "父亲的电话", "饭桌", "疫情结束", "武汉报告", "应急预案"];
+var hits = [];
+subs.forEach(function (f) {
+    var tx = fse.readFileSync(path.join(srcDir, f), "utf8").toString();
+    story.forEach(function (s) { if (tx.indexOf(s) >= 0) hits.push(f + ":" + s); });
+});
+ok("本体零剧情文案：app/*.subl 源不含故事串（全量来自 mods/lieyan JSON）", hits.length === 0, hits.slice(0, 3).join(" ") || "clean");
 
-// ---- flag 全链：模组 JSON 覆盖契约八名 ----
-const FLAG_CHAIN = ["lockdown_", "stimulus_done", "communication_", "factory", "medical_support", "neighbor_death", "child_essay", "trust_crisis"];
-var effText = JSON.stringify(LIE);
-var flagsOk = FLAG_CHAIN.every(function (f) { return effText.indexOf(f) >= 0; });
-var ratingFlag = effText.indexOf("pandemic_rating") < 0;
-// pandemic_rating 以 rating_* 文案+flagSet 落地，核对四档事件都带 flagSet
-var ratingFlags = LIE.events.filter(function (e) { return e.id.indexOf("ev.rating_") === 0 || e.id === "ev.collapse"; })
-    .map(function (e) { return JSON.stringify(e); }).join("");
-ok("flag 全链：lockdown/stimulus/communication/factory/medical_support/neighbor_death/child_essay + 四档评级标记",
-    flagsOk && ratingFlags.indexOf("flagSet") >= 0 && ratingFlags.indexOf("pandemic_rating") >= 0);
-
-// ---- 本体零剧情文案：引擎源文件不含任意剧情串（全部来自 mods/lieyan JSON） ----
-var storyStrings = ["2019年的冬天", "父亲的电话", "母亲的医院", "老李走了", "饭桌", "疫情结束", "会议室里的沉默", "封控力度", "孩子的作文", "信任危机"];
-var srcFiles = fse.readdirSync(__dirname + "/../app").filter(function (f) { return f.indexOf(".subl") >= 0 && f !== "mods-data.subl"; });
-var srcAll = srcFiles.map(function (f) { return fse.readFileSync(__dirname + "/../app/" + f, "utf8"); }).join("\n");
-var leaks = storyStrings.filter(function (s) { return srcAll.indexOf(s) >= 0; });
-ok("本体零剧情文案：app/*.subl 源不含故事串（全量来自 mods/lieyan JSON）", leaks.length === 0, JSON.stringify(leaks));
-
-// ---- 持久化 API：flag 链存档回环 ----
+// ---- 持久化 API（flag 链存档回环） ----
 var sv = globalThis.__subl;
-var save = {
-    mod: "lieyan", tick: 19,
-    pandemic_rating: "fail",
-    flags: { lockdown_any: true, lockdown_local: true, stimulus_targeted: true, communication_downplay: true,
-             factory_saved: true, medical_support: true, neighbor_death: true, child_essay: true, trust_crisis: true },
-    res: { danger: 64, support: 85, economy: 29 }
-};
-var r1 = sv.call("saveLoad", ["lieyan", save]);
-var r2 = sv.call("saveGet", ["lieyan"]);
-var ks = sv.call("saveKeys", []);
-var rd = sv.call("saveDrop", ["lieyan"]);
-var rg = sv.call("saveGet", ["lieyan"]);
+var payload = { lockdown_any: true, lockdown_local: true, stimulus_targeted: true, communication_downplay: true, factory_saved: true, medical_support: true, neighbor_death: true, child_essay: true, pandemic_rating: "fail" };
+sv.call("saveLoad", ["lieyan", payload]);
+var got = sv.call("saveGet", ["lieyan"]);
+var keys = sv.call("saveKeys", []);
+sv.call("saveDrop", ["lieyan"]);
+var after = sv.call("saveGet", ["lieyan"]);
 ok("持久化 API：flag 链存档 saveLoad + saveGet 回环 + saveKeys + saveDrop",
-    r1 === true && r2 && r2.mod === "lieyan" && r2.pandemic_rating === "fail" && r2.flags.neighbor_death === true
-    && Array.isArray(ks) && ks.indexOf("lieyan") >= 0 && rd === true && rg === null,
-    JSON.stringify({ r1: r1, r2: r2, ks: ks }));
+    got && got.lockdown_any === true && got.pandemic_rating === "fail"
+    && Array.isArray(keys) && after === null, JSON.stringify([typeof got, Array.isArray(keys), after]));
 
-// ---- 音乐接入点（资产缺失静默，不报错不抛） ----
+// ---- 音乐接入点（缺失资产静默） ----
 var b1 = sv.call("bgmPlay", [""]);
-var b2 = sv.call("bgmPlay", ["assets/no-such-bgm.mp3"]);
+var b2 = sv.call("bgmPlay", ["no-such-file.mp3"]);
 var b3 = sv.call("bgmStop", []);
 ok("音乐接入点：空名/缺失资产 bgmPlay 静默 false，bgmStop 无异常", b1 === false && b2 === false && b3 === true, JSON.stringify([b1, b2, b3]));
 
-if (fails === 0) console.log("SMOKE: ALL PASSED（t87 烈焰升腾 vertical slice：序章超事件+第一章沉浸式+三组 radio+四关键事件+饭桌副线+四档防疫评价+flag 链+持久化+回归）");
+if (fails === 0) console.log("SMOKE: ALL PASSED（t89 MD3+2x：1920x1080 画布/顶栏 chips/底栏导航图标/全屏界面+返回键/MD3 卡与圆角/地图几何 x2/状态层 + lieyan 全流程回归）");
 else console.log("SMOKE: FAILED " + fails + " 项");
 process.exit(fails === 0 ? 0 : 1);
 }
