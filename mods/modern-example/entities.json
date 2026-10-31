@@ -1,27 +1,505 @@
 {
   "countries": [
-    { "id": "country.dongning", "name": "东宁民国" }
+    {
+      "id": "country.dongning",
+      "name": "东宁民国"
+    }
   ],
   "factions": [
-    { "id": "faction.industrial", "name": "实业派", "desc": "以实业路线影响政策解锁" },
-    { "id": "faction.military", "name": "军政派", "desc": "以军政路线影响政策解锁" }
+    {
+      "id": "faction.industrial",
+      "name": "实业派"
+    },
+    {
+      "id": "faction.military",
+      "name": "军政派"
+    }
   ],
-  "ui": { "basic": "基本政策", "tree": "国家政策", "attrs": "国家属性", "blocks": "控制地块" },
-  "policiesBasic": [
-    { "id": "policy.trade", "name": "贸易立国", "desc": "开放通商口岸", "faction": "faction.industrial", "on": false },
-    { "id": "policy.education", "name": "国民教育", "desc": "推行基础教育", "faction": "", "on": false }
+  "ui": {
+    "ops": "操作",
+    "policy": "国策",
+    "attrs": "国家属性",
+    "blocks": "控制地块",
+    "gameOver": "终局"
+  },
+  "resources": [
+    {
+      "id": "res.politics",
+      "name": "政治点",
+      "start": 12,
+      "max": 99,
+      "produce": 2
+    },
+    {
+      "id": "res.tech",
+      "name": "科技点",
+      "start": 8,
+      "max": 99,
+      "produce": 1
+    },
+    {
+      "id": "res.treasury",
+      "name": "国库",
+      "start": 200,
+      "max": 999,
+      "produce": 10
+    },
+    {
+      "id": "res.stability",
+      "name": "稳定",
+      "start": 50,
+      "max": 100,
+      "produce": 0
+    }
   ],
-  "policiesTree": [
-    { "id": "policy.heavy_industry", "name": "重工业体系", "requires": "policy.trade", "faction": "faction.industrial" },
-    { "id": "policy.navy", "name": "近海海军", "requires": "policy.trade", "faction": "faction.military" }
+  "policies": [
+    {
+      "id": "policy.trade",
+      "name": "贸易立国",
+      "requires": [],
+      "effects": [
+        {
+          "op": "res",
+          "v": "res.treasury",
+          "n": 20
+        }
+      ]
+    },
+    {
+      "id": "policy.edu",
+      "name": "国民教育",
+      "requires": [
+        "policy.trade"
+      ],
+      "effects": [
+        {
+          "op": "res",
+          "v": "res.stability",
+          "n": 10
+        }
+      ]
+    },
+    {
+      "id": "policy.navy",
+      "name": "近海海军",
+      "requires": [
+        "policy.trade"
+      ],
+      "effects": [
+        {
+          "op": "res",
+          "v": "res.tech",
+          "n": 5
+        }
+      ]
+    }
   ],
-  "attrs": [
-    { "id": "attr.stability", "name": "稳定度", "value": 50, "max": 100 },
-    { "id": "attr.treasury", "name": "国库", "value": 200, "max": 999 }
+  "chapters": [
+    {
+      "id": "ch.opening",
+      "act": "第一幕",
+      "name": "开国序章",
+      "ticks": 2,
+      "ap": 3,
+      "perTick": [
+        {
+          "op": "res",
+          "v": "res.treasury",
+          "n": 10
+        },
+        {
+          "op": "res",
+          "v": "res.politics",
+          "n": 2
+        }
+      ],
+      "ops": [
+        {
+          "id": "op.economy",
+          "name": "经济",
+          "desc": "产业与财政路线",
+          "status": [
+            "res.treasury",
+            "res.stability"
+          ],
+          "options": [
+            {
+              "id": "op.economy.laissez",
+              "name": "自由放任",
+              "desc": "国库 +25 / 稳定 -2",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.treasury",
+                  "n": 25
+                },
+                {
+                  "op": "res",
+                  "v": "res.stability",
+                  "n": -2
+                }
+              ]
+            },
+            {
+              "id": "op.economy.state",
+              "name": "国家干预",
+              "desc": "国库 +40 / 稳定 -5",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.treasury",
+                  "n": 40
+                },
+                {
+                  "op": "res",
+                  "v": "res.stability",
+                  "n": -5
+                }
+              ]
+            },
+            {
+              "id": "op.economy.plan",
+              "name": "统制经济",
+              "desc": "国库 +30 / 政治 -3",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.treasury",
+                  "n": 30
+                },
+                {
+                  "op": "res",
+                  "v": "res.politics",
+                  "n": -3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "op.military",
+          "name": "军政",
+          "desc": "军备与征兵路线",
+          "status": [
+            "res.politics",
+            "res.treasury"
+          ],
+          "options": [
+            {
+              "id": "op.military.expand",
+              "name": "扩充军备",
+              "desc": "政治 +5 / 国库 -10",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.politics",
+                  "n": 5
+                },
+                {
+                  "op": "res",
+                  "v": "res.treasury",
+                  "n": -10
+                }
+              ]
+            },
+            {
+              "id": "op.military.elite",
+              "name": "精兵整编",
+              "desc": "科技 +4 / 国库 -6",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.tech",
+                  "n": 4
+                },
+                {
+                  "op": "res",
+                  "v": "res.treasury",
+                  "n": -6
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "end": {
+        "when": [],
+        "next": 1,
+        "dateJump": {
+          "y": 1910,
+          "m": 3,
+          "d": 1
+        },
+        "effects": [
+          {
+            "op": "res",
+            "v": "res.stability",
+            "n": 5
+          }
+        ],
+        "lines": [
+          "新政初行，百废待兴。",
+          "（第一章落幕，时间来到 1910 年春）"
+        ]
+      }
+    },
+    {
+      "id": "ch.spring",
+      "act": "第一幕",
+      "name": "春潮涌动",
+      "ticks": 2,
+      "ap": 2,
+      "perTick": [
+        {
+          "op": "res",
+          "v": "res.tech",
+          "n": 1
+        }
+      ],
+      "ops": [
+        {
+          "id": "op.edu",
+          "name": "文教",
+          "desc": "教育与舆论路线",
+          "status": [
+            "res.stability"
+          ],
+          "options": [
+            {
+              "id": "op.edu.schools",
+              "name": "兴办学堂",
+              "desc": "稳定 +8 / 国库 -8",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.stability",
+                  "n": 8
+                },
+                {
+                  "op": "res",
+                  "v": "res.treasury",
+                  "n": -8
+                }
+              ]
+            },
+            {
+              "id": "op.edu.press",
+              "name": "办报立言",
+              "desc": "政治 +3 / 稳定 +3",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.politics",
+                  "n": 3
+                },
+                {
+                  "op": "res",
+                  "v": "res.stability",
+                  "n": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "end": {
+        "when": [],
+        "next": -1,
+        "effects": [],
+        "lines": [
+          "乱世如潮，深谋者远。",
+          "（篇终）"
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "ev.opening",
+      "kind": "super",
+      "once": true,
+      "title": "民国元年",
+      "when": [
+        {
+          "op": "tick",
+          "n": 1
+        }
+      ],
+      "bgm": "",
+      "lines": [
+        "钟声划破迷雾，新朝初立。",
+        "深谋远虑，自此而始。"
+      ]
+    },
+    {
+      "id": "ev.envoy",
+      "kind": "imm",
+      "once": true,
+      "title": "使节来访",
+      "side": "东宁使节",
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 2
+        }
+      ],
+      "bg": "",
+      "portrait": "",
+      "lines": [
+        "「我国新立，愿与贵国修好。」",
+        "「铁路、电报、海关——皆可商量。」",
+        "（使节留下礼单告辞）"
+      ]
+    },
+    {
+      "id": "ev.parade",
+      "kind": "card",
+      "once": true,
+      "priority": 25,
+      "title": "银行团贺电",
+      "when": [
+        {
+          "op": "flag",
+          "v": "flag.loan"
+        }
+      ],
+      "content": "接受洋行借款后，银行团发来贺电并示意进一步合作。",
+      "options": [
+        {
+          "name": "深化合作",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.treasury",
+              "n": 30
+            },
+            {
+              "op": "flagSet",
+              "v": "flag.loan_deep"
+            }
+          ]
+        },
+        {
+          "name": "保持距离",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.loan",
+      "kind": "card",
+      "once": true,
+      "title": "洋行借款",
+      "when": [
+        {
+          "op": "resGte",
+          "v": "res.treasury",
+          "n": 230
+        }
+      ],
+      "content": "外资洋行愿提供低息借款，条件是海关抵押。",
+      "options": [
+        {
+          "name": "接受借款",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.treasury",
+              "n": 60
+            },
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": -8
+            },
+            {
+              "op": "flagSet",
+              "v": "flag.loan"
+            }
+          ]
+        },
+        {
+          "name": "婉拒",
+          "effects": [
+            {
+              "op": "flagSet",
+              "v": "flag.loan_refused"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.strike",
+      "kind": "card",
+      "once": false,
+      "title": "工人请愿",
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 2
+        },
+        {
+          "op": "resLte",
+          "v": "res.stability",
+          "n": 48
+        }
+      ],
+      "content": "厂区工人聚集请愿，要求改善待遇。",
+      "options": [
+        {
+          "name": "安抚施恩",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": 12
+            },
+            {
+              "op": "res",
+              "v": "res.treasury",
+              "n": -15
+            }
+          ]
+        },
+        {
+          "name": "强硬弹压",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": -15
+            },
+            {
+              "op": "flagSet",
+              "v": "flag.suppressed"
+            }
+          ]
+        }
+      ]
+    }
   ],
   "blocks": [
-    { "id": "block.harbor", "name": "北港", "owner": "country.dongning" },
-    { "id": "block.central", "name": "中原", "owner": "country.dongning" },
-    { "id": "block.oldcity", "name": "旧城", "owner": "country.dongning" }
+    {
+      "id": "block.harbor",
+      "name": "北港",
+      "owner": "country.dongning"
+    },
+    {
+      "id": "block.central",
+      "name": "中原",
+      "owner": "country.dongning"
+    },
+    {
+      "id": "block.oldcity",
+      "name": "旧城",
+      "owner": "country.dongning"
+    }
   ]
 }

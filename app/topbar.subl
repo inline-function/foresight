@@ -1,35 +1,42 @@
-// topbar.subl —— 顶栏（fixed + z=10，沿用地图线已验证的顶栏方案）
-// 主标题 = 玩家国家名（全不透明，模组 mod.json.player.country）
-// 副标题 = 派系名（弱透明约 0.5：桥暂无 opacity 通道，以降色 COL_SUB 实现等观感）
-// 右侧 = 时间：内置 tick 计数但呈现为「慢一点的实时制」年月（era+起始年月+每推进月数+tick 秒数全由模组 time 配置驱动；非回合数）
-// 一切文案经 mods.subl 来自模组 JSON；本体不含具体内容。
+// topbar.subl —— 顶栏（国家主标题全不透明 + 派系副标题弱透明 + 右侧日期与资源，全部由引擎状态驱动）
+// 日期 = 引擎 tick（1 tick = 1 天）按天推进；资源行 = entities.resources 的即时值；
+// 时间标签与资源标签独立 tag（refreshTopbar 原位重建）。
+fun TITLE_H(): Rat = 46.0
+fun TBAR_HEX(): Str = "#1B2430"
+fun SUB_HEX(): Str = "#8FA3B8"
+fun RES_HEX(): Str = "#9FB3C7"
 
-fun TBAR_H(): Rat = 36.0
-fun TIME_X(): Rat = 700.0
-fun SUB_X(): Rat = 170.0
-fun LABEL_X(): Rat = 430.0
-fun COL_TBAR(): Str = "#1B2430"
-fun TBAR_W(): Rat = 960.0
-
-// 时间展示串：era + " · " + 年月（年月数字来自 tick 状态，era 来自模组）
-fun dateText(y: Rat, mo: Rat): Str = concat(concat(concat(toStr(y), " 年 "), toStr(mo)), " 月")
 @impure
-fun timeLabelText(md: Json, y: Rat, mo: Rat): Str = concat(concat(timeEra(md), " · "), dateText(y, mo))
-fun timeNextYear(y: Rat, mo: Rat): Rat = (y + floor(((mo - 1.0) / 12.0)))
-fun timeNextMonth(mo: Rat): Rat = (((mo - 1.0) - (floor(((mo - 1.0) / 12.0)) * 12.0)) + 1.0)
-
-// 顶栏：返回时间标签对象（tick 时由 main 更新它）。
-@impure
-fun buildTopbar(m: Json): Any {
+fun buildTopbar(m: Json, s: Str): Null {
     var md: Json = modMod(m)
     var ent: Json = modEnt(m)
-    var bar: Any = addRectT(TBAR_W(), TBAR_H(), 0.0, 0.0, COL_TBAR(), "ui", 10.0)
-    var country: Str = playerCountry(md)
-    var facName: Str = factionName(ent, playerFactionId(md))
-    var t: Any = addTextT(country, 14.0, 8.0, 18.0, 700, COL_TITLE(), "ui", true, 11.0)
-    var s: Any = addTextT(facName, SUB_X(), 13.0, 15.0, 400, COL_SUB(), "ui", true, 11.0)
-    var y0: Rat = timeStartYear(md)
-    var mo0: Rat = timeStartMonth(md)
-    var tl: Any = addTextT(timeLabelText(md, y0, mo0), TIME_X(), 8.0, 16.0, 400, COL_SUB(), "ui", true, 11.0)
-    return tl
+    var bar: Any = addRectT(960.0, TITLE_H(), 0.0, 0.0, TBAR_HEX(), "ui", 10.0)
+    var tt: Any = addTextT(playerCountry(md), 14.0, 5.0, 17.0, 700, "#F0F4F8", "ui", true, 11.0)
+    var ft: Any = addTextT(factionName(ent, playerFactionId(md)), 14.0, 26.0, 12.0, 400, SUB_HEX(), "ui", true, 11.0)
+    refreshTopbar(m, s)
+    null
 }
+
+// 顶栏右半：日期（era 前缀 + 年月日，无回合数）与资源行，随引擎状态刷新
+@impure
+fun refreshTopbar(m: Json, s: Str): Null {
+    objsDestroyTag("ui-time")
+    objsDestroyTag("ui-res")
+    var md: Json = modMod(m)
+    var dt: Str = dateText(engNum(s, F_Y()), engNum(s, F_M()), engNum(s, F_D()))
+    var tt: Str = if (strCmp(timeEra(md), "") == 0) dt else concat(concat(timeEra(md), " · "), dt)
+    var t1: Any = addTextT(tt, 700.0, 9.0, 15.0, 400, SUB_HEX(), "ui-time", true, 12.0)
+    var t2: Any = addTextT(resLineText(m, s), 175.0, 28.0, 12.0, 400, RES_HEX(), "ui-res", true, 12.0)
+    null
+}
+
+// 资源行（至多前 3 项：name val，· 分隔）
+@impure
+fun resLineLoop(m: Json, s: Str, i: Nat, n: Nat, acc: Str): Str =
+    if ((i >= n) || (i >= 3)) acc
+    else {
+        var part: Str = concat(concat(resName(modEnt(m), i), " "), toStr(resStrGet(engField(s, F_RES()), i)))
+        resLineLoop(m, s, (i + 1), n, if (i == 0) part else concat(concat(acc, " · "), part))
+    }
+@impure
+fun resLineText(m: Json, s: Str): Str = resLineLoop(m, s, 0, resCount(modEnt(m)), "")

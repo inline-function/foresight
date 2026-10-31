@@ -1,16 +1,16 @@
 // main.subl —— 《深谋远虑》主控（foresight = 模组加载器：本体不做内容）
-// 场景链路（t83 骨架 + t85 顶栏底栏/模组数据）：
-//   mods 烘焙表（mods-data.subl，scripts/gen-mods.js 扫描 mods/ 生成）
-//   -> entities.blocks 命名/归属驱动地图三地块（mapLoad 烘焙硬边精灵）
-//   -> 顶栏（topbar.subl：国家主标题/派系副标题/慢实时制时间，全模组驱动）
-//   -> 底栏（bottombar.subl：四面板按钮 + 通用面板，行内容全模组驱动）
-//   -> 相机缩放（滚轮锚定光标）/ 平移（拖拽钳制）/ 点击选中。
+// 场景链路：mods 烘焙表（mods-data.subl）-> 叙事引擎（engine.subl 六段 tick 循环：
+//   日期推进+资源产出 -> 玩家操作（操作面板 radio 组，行动点 2~4，用完自动结算，可不操作）
+//   -> 事件触发（tick序数/条件/副线，事件/沉浸式/超事件按优先级）-> 玩家处理事件
+//   -> 结算（效果+章末判定+dateJump 演出）-> 下一 tick）+ 地图三地块（entities.blocks 命名/归属）
+//   + 顶栏日期/资源由引擎状态驱动 + 相机缩放/平移/点击选中。
+// 状态串 st2（engine.subl）由本闭包 @mut 持有，各阶段模块级 @impure 函数进出串接。
 // t84 解释器交付前，模组 logic/*.subl 只扫描进清单不执行（mods/README.md）。
 
 // ---------- 画布与布局 ----------
 fun VIEW_W(): Rat = 960.0
 fun VIEW_H(): Rat = 540.0
-fun TITLE_H(): Rat = 36.0
+fun LABEL_X(): Rat = 430.0
 
 // ---------- 地图包围盒（世界像素；smoke-data.subl 三地块的极值） ----------
 fun TX0(): Rat = 140.0
@@ -56,7 +56,7 @@ fun zoomViewYAt(viewS: Rat, viewY: Rat, wa: Rat, ns: Rat): Rat = (wa - ((screenY
 fun panXOf(viewS: Rat, viewX: Rat, dx: Rat): Rat = clampP((viewX - (dx / viewS)), panMinX(viewS), panMaxX(viewS))
 fun panYOf(viewS: Rat, viewY: Rat, dy: Rat): Rat = clampP((viewY - (dy / viewS)), panMinY(viewS), panMaxY(viewS))
 
-// ---------- 通用 UI 组件（fixed 屏幕坐标 + z 分层；顶栏 10 / 底栏 10-12 / 面板 20） ----------
+// ---------- 通用 UI 组件（fixed 屏幕坐标 + z 分层；顶栏 10-12 / 底栏 10-12 / 面板 20 / 事件层 26-50） ----------
 @impure
 fun addRectT(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat): Any {
     unchecked var o = objAdd()
@@ -93,19 +93,6 @@ fun mapRowsLoop(ent: Json, n: Nat, i: Nat, acc: Str): Str =
     }
 @impure
 fun mapTableOf(ent: Json): Str = mapRowsLoop(ent, blockCount(ent), 0, "")
-
-// ---------- 基本政策初始开关态（来自模组 policiesBasic.on） ----------
-@impure
-fun initTogglesLoop(ent: Json, n: Nat, i: Nat, acc: Str): Str =
-    if (i >= n) acc
-    else {
-        var row: Json = arrAt(jk(ent, "policiesBasic"), i)
-        var pid: Str = jstr(row, "id")
-        var on: Bool = jbool(row, "on")
-        initTogglesLoop(ent, n, (i + 1), if (on) concat(acc, concat(pid, "|")) else acc)
-    }
-@impure
-fun initToggles(ent: Json): Str = initTogglesLoop(ent, arrLen(jk(ent, "policiesBasic")), 0, "|")
 
 // ---------- 渲染 ----------
 @impure
@@ -151,20 +138,13 @@ fun runSmoke(): Null {
     var ent: Json = modEnt(m)
     var geo: Any = mapLoad(mapTableOf(ent))
     var n: Nat = mapProvCount(geo)
-    // 海面背景：扩到地块包围盒 + PAD。
-    var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_BG())
+    var bg: Any = rectAdd(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()))
     objTag(bg, "ui")
-    // 顶栏（含时间标签）/ 选中提示 / 底栏（四面板按钮）
-    var tl: Any = buildTopbar(m)
-    var label: Any = addTextT("", LABEL_X(), 13.0, 15.0, 400, COL_SUB(), "ui", true, 11.0)
-    buildBottombar(m)
-    @mut var toggles: Str = initToggles(ent)
-    @mut var panel: Str = "none"
-    @mut var year: Rat = timeStartYear(md)
-    @mut var month: Rat = timeStartMonth(md)
-    var tickSec: Rat = timeTickSeconds(md)
-    var mpTick: Rat = timeMonthsPerTick(md)
     @mut var sel: Int = -1
+    @mut var st: Str = engInit(md, ent)
+    buildTopbar(m, st)
+    var label: Any = addTextT("", LABEL_X(), 28.0, 13.0, 400, COL_SUB(), "ui", true, 11.0)
+    buildBottombar(m)
     @mut var viewS: Rat = 1.0
     @mut var viewX: Rat = INIT_X()
     @mut var viewY: Rat = INIT_Y()
@@ -176,13 +156,8 @@ fun runSmoke(): Null {
     @mut var moved: Bool = false
     renderBlocks(geo, n, -1)
     applyView(viewS, viewX, viewY)
-    // 时间：内置 tick 计数 -> 呈现为模组驱动的年月（慢一点的实时制；非回合数）
-    every(tickSec) { _e =>
-        month = (month + mpTick)
-        year = timeNextYear(year, month)
-        month = timeNextMonth(month)
-        objTextSet(tl, timeLabelText(md, year, month))
-    }
+    // 引擎起步：tick 1（相位1 日期推进+资源产出 -> 相位2 玩家操作阶段自动开操作面板）
+    st = engTickStart(m, st)
     onScroll { dy =>
         var f: Rat = if (dy > 0.0) (1.0 / ZOOM_STEP()) else ZOOM_STEP()
         var gx: Rat = worldXOf(viewS, viewX, mousePosX())
@@ -221,29 +196,28 @@ fun runSmoke(): Null {
     } }
     onMouseRelease("left") { _e => if (pressed) {
         if (!moved) {
-            var b: Nat = whichBtn(pressX, pressY)
-            if (b < BTN_N()) {
-                var kind: Str = btnKind(b)
-                if (strCmp(kind, panel) == 0) {
-                    objsDestroyTag("panel")
-                    panel = "none"
-                } else {
-                    objsDestroyTag("panel")
-                    renderPanel(m, kind, toggles)
-                    panel = kind
-                }
-            } else {
-                if (strCmp(panel, "basic") == 0) {
-                    var rows: Nat = panelRowCount(ent, "basic")
-                    var ri: Nat = panelRowHit(pressY, 0, rows)
-                    if (ri < rows) {
-                        toggles = flipToggleRow(ent, toggles, ri)
-                        objsDestroyTag("panel")
-                        renderPanel(m, "basic", toggles)
-                    }
-                } else {
-                    if (strCmp(panel, "none") == 0) {
-                        sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY))
+            var ph: Str = engField(st, F_PHASE())
+            if (strCmp(ph, "over") == 0) null
+            else {
+                if (strCmp(ph, "events") == 0) { st = engViewClick(m, st, pressX, pressY) }
+                else {
+                    var b: Nat = whichBtn(pressX, pressY)
+                    if (b < BTN_N()) {
+                        var kind: Str = btnKind(b)
+                        if (strCmp(kind, engField(st, F_PANEL())) == 0) {
+                            objsDestroyTag("panel")
+                            st = engSet(st, F_PANEL(), "none")
+                        } else {
+                            if (strCmp(kind, "ops") == 0) { st = engOpsOpen(m, st) }
+                            else { st = renderPanelKind(m, st, kind) }
+                        }
+                    } else {
+                        var pn: Str = engField(st, F_PANEL())
+                        if (strCmp(pn, "ops") == 0) { st = opsPanelHit(m, st, pressX, pressY) }
+                        else {
+                            if (strCmp(pn, "policy") == 0) { st = policyPanelHit(m, st, pressX, pressY) }
+                            else { if (strCmp(pn, "none") == 0) { sel = selectAt(geo, n, label, sel, worldXOf(viewS, viewX, pressX), worldYOf(viewS, viewY, pressY)) } else null }
+                        }
                     }
                 }
             }

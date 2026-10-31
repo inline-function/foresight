@@ -53,7 +53,29 @@ mods.forEach(function (m) {
     if (!p.faction) miss.push("player.faction");
     if (!t.startYear) miss.push("time.startYear");
     if (!t.startMonth) miss.push("time.startMonth");
+    if (!t.startDay) miss.push("time.startDay（tick 单位=天）");
     if (miss.length) fail(m.id + "/mod.json 缺字段 " + miss.join(","));
+    // 引擎结构校验（叙事 schema：章节/事件/资源/国策可缺失，有则必合法）
+    var e = m.entities;
+    if (e) {
+        var chs = e.chapters || [];
+        chs.forEach(function (c, ci) {
+            if (!c.name) fail(m.id + "/chapters[" + ci + "] 缺 name");
+            if (!(c.ticks > 0)) fail(m.id + "/chapters[" + ci + "] 缺 ticks（tick 预算）");
+            (c.ops || []).forEach(function (pg, pi) {
+                if (!pg.name) fail(m.id + "/chapters[" + ci + "].ops[" + pi + "] 缺 name");
+                (pg.options || []).forEach(function (o, oi) {
+                    if (!o.name) fail(m.id + "/chapters[" + ci + "].ops[" + pi + "].options[" + oi + "] 缺 name");
+                });
+            });
+        });
+        (e.events || []).forEach(function (v, vi) {
+            if (!v.id) fail(m.id + "/events[" + vi + "] 缺 id");
+            if (["card", "imm", "super"].indexOf(v.kind) < 0) fail(m.id + "/events[" + vi + "] kind 必须是 card/imm/super");
+            if (v.kind === "card" && !v.options) fail(m.id + "/events[" + vi + "] card 事件缺 options");
+            if (v.kind !== "card" && !v.lines) fail(m.id + "/events[" + vi + "] 沉浸式/超事件缺 lines");
+        });
+    }
 });
 
 var json = JSON.stringify(mods);

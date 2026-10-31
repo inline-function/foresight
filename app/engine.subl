@@ -1,0 +1,498 @@
+// engine.subl —— 叙事引擎（六段 tick 循环 / 章节·幕·tick预算 / 事件队列优先级 / flag与资源状态 / 条件触发 / 章末结算）
+// 架构决策（game doc/架构决策.md，队长裁决）：回合制非实时钟；tick = 1 天；
+// 顶栏日期按天推进，章末 dateJump 由演出负责跳日期。
+// 本体不含任何剧情内容；章节/事件/操作页/选项/资源/效果全部由模组 entities.json 驱动。
+//
+// 实现约束（Sublimation 无嵌套函数/无元组/无 ref）：全部引擎状态编码进单一字符串 st2，
+// 由 main 持有的闭包 @mut 变量串接；各阶段为模块级 @impure 函数（st2 进出 + 就地渲染）。
+// st2 字段（"@" 分隔，共 19 段）：
+//   0 phase("idle"/"ops"/"events"/"settle"/"over")  1 flags(|id|)  2 res(v1|v2...)
+//   3 tick  4 chap  5 inChap  6 ap  7 apMax  8 queue(|事件id|)  9 fired(|已触发id|)
+//   10 sel(|p<页>o<选项>|)  11 page("L"=操作页列表/序号)  12 panel
+//   13 year  14 month  15 day  16 step(逐行演出进度)  17 chend(章末演出中标记"1")  18 chnext(下一章序号/-1=篇终)
+
+// ---------- 字段常量 ----------
+fun F_PHASE(): Nat = 0
+fun F_FLAGS(): Nat = 1
+fun F_RES(): Nat = 2
+fun F_TICK(): Nat = 3
+fun F_CHAP(): Nat = 4
+fun F_INCHAP(): Nat = 5
+fun F_AP(): Nat = 6
+fun F_APMAX(): Nat = 7
+fun F_QUEUE(): Nat = 8
+fun F_FIRED(): Nat = 9
+fun F_SEL(): Nat = 10
+fun F_PAGE(): Nat = 11
+fun F_PANEL(): Nat = 12
+fun F_Y(): Nat = 13
+fun F_M(): Nat = 14
+fun F_D(): Nat = 15
+fun F_STEP(): Nat = 16
+fun F_CHEND(): Nat = 17
+fun F_CHNEXT(): Nat = 18
+fun F_N(): Nat = 19
+
+// ---------- 字段读写 ----------
+fun catS(a: Str, b: Str): Str = concat(concat(a, "@"), b)
+@impure
+fun engField(s: Str, i: Nat): Str = strOr(elementAt(strSplit(s, "@"), i), "")
+@impure
+fun engNum(s: Str, i: Nat): Nat = natOr(parseNat(engField(s, i)), 0)
+@impure
+fun engSetLoop(s: Str, i: Nat, v: Str, k: Nat, n: Nat): Str =
+    if (k >= n) ""
+    else concat(concat(if (k == 0) "" else "@", if (k == i) v else engField(s, k)), engSetLoop(s, i, v, (k + 1), n))
+@impure
+fun engSet(s: Str, i: Nat, v: Str): Str = engSetLoop(s, i, v, 0, F_N())
+@impure
+fun engSetNum(s: Str, i: Nat, v: Nat): Str = engSet(s, i, toStr(v))
+
+// ---------- 日期（tick = 1 天） ----------
+fun daysInMonth(m: Nat): Nat =
+    if (m == 2) 28
+    else (if (m == 4) 30
+    else (if (m == 6) 30
+    else (if (m == 9) 30
+    else (if (m == 11) 30 else 31))))
+fun prevDayY(y: Nat, m: Nat, d: Nat): Nat = if (d > 1) y else (if (m > 1) y else (y - 1))
+fun prevDayM(m: Nat, d: Nat): Nat = if (d > 1) m else (if (m > 1) (m - 1) else 12)
+fun prevDayD(m: Nat, d: Nat): Nat = if (d > 1) (d - 1) else (if (m > 1) daysInMonth(m - 1) else 31)
+fun dateText(y: Nat, m: Nat, d: Nat): Str =
+    concat(concat(concat(concat(concat(toStr(y), " 年 "), toStr(m)), " 月 "), toStr(d)), " 日")
+@impure
+fun engDateNext(s: Str): Str {
+    var y: Nat = engNum(s, F_Y())
+    var mo: Nat = engNum(s, F_M())
+    var d: Nat = engNum(s, F_D())
+    var d2: Nat = d + 1
+    var mo2: Nat = mo
+    var y2: Nat = y
+    if (d2 > daysInMonth(mo)) {
+        d2 = 1
+        mo2 = mo + 1
+        if (mo2 > 12) { mo2 = 1; y2 = y + 1 } else null
+    } else null
+    engSetNum(engSetNum(engSetNum(s, F_Y(), y2), F_M(), mo2), F_D(), d2)
+}
+@impure
+fun engDateJump(s: Str, y: Nat, mo: Nat, d: Nat): Str =
+    engSetNum(engSetNum(engSetNum(s, F_D(), d), F_M(), mo), F_Y(), y)
+
+// ---------- 资源（按 entities.resources 声明顺序） ----------
+@impure
+fun resCount(ent: Json): Nat = arrLen(jk(ent, "resources"))
+@impure
+fun resRow(ent: Json, i: Nat): Json = arrAt(jk(ent, "resources"), i)
+@impure
+fun resName(ent: Json, i: Nat): Str = jstr(resRow(ent, i), "name")
+@impure
+fun resStart(ent: Json, i: Nat): Nat = jnum(resRow(ent, i), "start")
+@impure
+fun resMax(ent: Json, i: Nat): Nat = jnum(resRow(ent, i), "max")
+@impure
+fun resProduce(ent: Json, i: Nat): Nat = jnum(resRow(ent, i), "produce")
+@impure
+fun resInitLoop(ent: Json, i: Nat, n: Nat, acc: Str): Str =
+    if (i >= n) acc
+    else resInitLoop(ent, (i + 1), n, concat(concat(acc, if (i == 0) "" else "|"), toStr(resStart(ent, i))))
+@impure
+fun resInit(ent: Json): Str = resInitLoop(ent, 0, resCount(ent), "")
+@impure
+fun resStrGet(s: Str, i: Nat): Nat = natOr(parseNat(strOr(elementAt(strSplit(s, "|"), i), "0")), 0)
+@impure
+fun resStrSetLoop(s: Str, t: Nat, v: Str, k: Nat, n: Nat): Str =
+    if (k >= n) ""
+    else concat(concat(if (k == 0) "" else "|", if (k == t) v else toStr(resStrGet(s, k))), resStrSetLoop(s, t, v, (k + 1), n))
+@impure
+fun resStrSet(s: Str, t: Nat, v: Nat, n: Nat): Str = resStrSetLoop(s, t, toStr(v), 0, n)
+fun clampRes(v: Rat, hi: Nat): Rat = if (v < 0.0) 0.0 else (if (v > toRat(hi)) toRat(hi) else v)
+@impure
+fun resIndexByIdLoop(ent: Json, id: Str, i: Nat, n: Nat): Nat =
+    if (i >= n) n
+    else (if (strCmp(jstr(resRow(ent, i), "id"), id) == 0) i else resIndexByIdLoop(ent, id, (i + 1), n))
+@impure
+fun resApplyId(ent: Json, rs: Str, id: Str, delta: Rat): Str {
+    var cnt: Nat = resCount(ent)
+    var i: Nat = resIndexByIdLoop(ent, id, 0, cnt)
+    if (i >= cnt) rs
+    else resStrSet(rs, i, clampRes(toRat(resStrGet(rs, i)) + delta, resMax(ent, i)), cnt)
+}
+@impure
+fun resValById(ent: Json, s: Str, id: Str): Nat =
+    resStrGet(engField(s, F_RES()), resIndexByIdLoop(ent, id, 0, resCount(ent)))
+
+// ---------- 章节 / 幕 / tick预算 ----------
+@impure
+fun chapters(ent: Json): Json = jk(ent, "chapters")
+@impure
+fun chapterCount(ent: Json): Nat = arrLen(chapters(ent))
+@impure
+fun chapterRow(ent: Json, i: Nat): Json = arrAt(chapters(ent), i)
+@impure
+fun chapterName(ent: Json, i: Nat): Str = jstr(chapterRow(ent, i), "name")
+@impure
+fun chapterAct(ent: Json, i: Nat): Str = jstr(chapterRow(ent, i), "act")
+@impure
+fun chapterTicks(ent: Json, i: Nat): Nat = jnum(chapterRow(ent, i), "ticks")
+@impure
+fun chapterAp(ent: Json, i: Nat): Nat = jnum(chapterRow(ent, i), "ap")
+@impure
+fun chapterPerTick(ent: Json, i: Nat): Json = jk(chapterRow(ent, i), "perTick")
+@impure
+fun chapterOps(ent: Json, i: Nat): Json = jk(chapterRow(ent, i), "ops")
+@impure
+fun chapterEnd(ent: Json, i: Nat): Json = jk(chapterRow(ent, i), "end")
+@impure
+fun endWhen(ent: Json, i: Nat): Json = jk(chapterEnd(ent, i), "when")
+@impure
+fun endLines(ent: Json, i: Nat): Json = jk(chapterEnd(ent, i), "lines")
+@impure
+fun endEffects(ent: Json, i: Nat): Json = jk(chapterEnd(ent, i), "effects")
+@impure
+fun endNext(ent: Json, i: Nat): Str = toStr(jnum(chapterEnd(ent, i), "next"))
+@impure
+fun endJumpY(ent: Json, i: Nat): Nat = jnum(jk(chapterEnd(ent, i), "dateJump"), "y")
+@impure
+fun endJumpM(ent: Json, i: Nat): Nat = jnum(jk(chapterEnd(ent, i), "dateJump"), "m")
+@impure
+fun endJumpD(ent: Json, i: Nat): Nat = jnum(jk(chapterEnd(ent, i), "dateJump"), "d")
+
+// ---------- 事件 / 队列优先级 ----------
+@impure
+fun events(ent: Json): Json = jk(ent, "events")
+@impure
+fun eventCount(ent: Json): Nat = arrLen(events(ent))
+@impure
+fun eventRow(ent: Json, i: Nat): Json = arrAt(events(ent), i)
+@impure
+fun evOnce(ent: Json, i: Nat): Bool = boolOr(jsonBool(jsonGet(eventRow(ent, i), "once")), true)
+@impure
+fun evWhen(ent: Json, i: Nat): Json = jk(eventRow(ent, i), "when")
+@impure
+fun evByIdLoop(ent: Json, id: Str, i: Nat, n: Nat): Json =
+    if (i >= n) emptyJson()
+    else (if (strCmp(jstr(eventRow(ent, i), "id"), id) == 0) eventRow(ent, i) else evByIdLoop(ent, id, (i + 1), n))
+@impure
+fun evById(ent: Json, id: Str): Json = evByIdLoop(ent, id, 0, eventCount(ent))
+fun kindPri(kind: Str): Rat = if (strCmp(kind, "super") == 0) 30.0 else (if (strCmp(kind, "imm") == 0) 20.0 else 10.0)
+@impure
+fun evPri(ent: Json, i: Nat): Rat {
+    var p: Rat = jnum(eventRow(ent, i), "priority")
+    if (p > 0.0) p else kindPri(jstr(eventRow(ent, i), "kind"))
+}
+fun queueEmpty(q: Str): Bool = strCmp(q, "|") == 0
+@impure
+fun qHead(q: Str): Str = strOr(elementAt(strSplit(q, "|"), 1), "")
+@impure
+fun qPop(q: Str, h: Str): Str = strReplace(q, concat(concat("|", h), "|"), "|")
+// 优先级四档带扫描（[30,inf)/[20,30)/[10,20)/[0,10)）：带内按 JSON 序（平局取早），跨带高优先级在前。
+@impure
+fun quQ(qu: Str): Str = strOr(elementAt(strSplit(qu, "@@"), 0), "")
+@impure
+fun quUsed(qu: Str): Str = strOr(elementAt(strSplit(qu, "@@"), 1), "")
+fun packQU(q: Str, u: Str): Str = concat(q, concat("@@", u))
+@impure
+fun qBandScanLoop(ent: Json, s: Str, q: Str, used: Str, band: Nat, i: Nat, n: Nat): Str =
+    if (i >= n) packQU(q, used)
+    else {
+        var id: Str = jstr(eventRow(ent, i), "id")
+        var p: Rat = evPri(ent, i)
+        var onceOk: Bool = if (evOnce(ent, i)) (!strHas(engField(s, F_FIRED()), id)) else true
+        var ok: Bool = ((!strHas(used, id)) && onceOk) && ((p >= bandLo(band)) && (p < bandHi(band)))
+        qBandScanLoop(ent, s, if (ok) concat(q, concat(id, "|")) else q, if (ok) concat(used, concat(id, "|")) else used, band, (i + 1), n)
+    }
+fun bandLo(b: Nat): Rat = if (b == 0) 30.0 else (if (b == 1) 20.0 else (if (b == 2) 10.0 else 0.0))
+fun bandHi(b: Nat): Rat = if (b == 0) 1000000.0 else (if (b == 1) 30.0 else (if (b == 2) 20.0 else 10.0))
+@impure
+fun buildQueueBand(ent: Json, s: Str, q: Str, used: Str, band: Nat): Str =
+    if (band >= 4) packQU(q, used)
+    else {
+        var r: Str = qBandScanLoop(ent, s, q, used, band, 0, eventCount(ent))
+        buildQueueBand(ent, s, quQ(r), quUsed(r), (band + 1))
+    }
+@impure
+fun buildQueue(ent: Json, s: Str): Str = quQ(buildQueueBand(ent, s, "|", "|", 0))
+
+// ---------- 条件原子（when 数组：AND 语义） ----------
+@impure
+fun whenHoldLoop(ent: Json, s: Str, atoms: Json, i: Nat, n: Nat): Bool =
+    if (i >= n) true
+    else (if (!atomHold(ent, s, arrAt(atoms, i))) false else whenHoldLoop(ent, s, atoms, (i + 1), n))
+@impure
+fun whenHold(ent: Json, s: Str, atoms: Json): Bool = whenHoldLoop(ent, s, atoms, 0, arrLen(atoms))
+@impure
+fun atomHold(ent: Json, s: Str, a: Json): Bool {
+    var op: Str = jstr(a, "op")
+    var v: Str = jstr(a, "v")
+    var n: Rat = jnum(a, "n")
+    if (strCmp(op, "tick") == 0) (toRat(engNum(s, F_TICK())) == n)
+    else (if (strCmp(op, "tickGte") == 0) (toRat(engNum(s, F_TICK())) >= n)
+    else (if (strCmp(op, "flag") == 0) strHas(engField(s, F_FLAGS()), v)
+    else (if (strCmp(op, "flagNot") == 0) (!strHas(engField(s, F_FLAGS()), v))
+    else (if (strCmp(op, "resGte") == 0) (toRat(resValById(ent, s, v)) >= n)
+    else (if (strCmp(op, "resLte") == 0) (toRat(resValById(ent, s, v)) <= n) else false)))))
+}
+
+// ---------- 效果（effects 数组） ----------
+@impure
+fun effLoop(ent: Json, s: Str, es: Json, i: Nat, n: Nat): Str =
+    if (i >= n) s
+    else effLoop(ent, effAtom(ent, s, arrAt(es, i)), es, (i + 1), n)
+@impure
+fun applyEffects(ent: Json, s: Str, es: Json): Str = effLoop(ent, s, es, 0, arrLen(es))
+@impure
+fun effAtom(ent: Json, s: Str, e: Json): Str {
+    var op: Str = jstr(e, "op")
+    var v: Str = jstr(e, "v")
+    var n: Rat = jnum(e, "n")
+    if (strCmp(op, "flagSet") == 0) engSet(s, F_FLAGS(), toggleAdd(engField(s, F_FLAGS()), v))
+    else (if (strCmp(op, "flagClear") == 0) engSet(s, F_FLAGS(), toggleDel(engField(s, F_FLAGS()), v))
+    else (if (strCmp(op, "res") == 0) engSet(s, F_RES(), resApplyId(ent, engField(s, F_RES()), v, n)) else s))
+}
+
+// ---------- 操作页 radio 选择态（sel 串里的令牌） ----------
+fun selToken(pid: Nat, oi: Nat): Str = concat(concat("p", toStr(pid)), concat("o", toStr(oi)))
+@impure
+fun selClearLoop(opts: Json, sel: Str, pid: Nat, i: Nat, n: Nat): Str =
+    if (i >= n) sel
+    else selClearLoop(opts, toggleDel(sel, selToken(pid, i)), pid, (i + 1), n)
+@impure
+fun selClear(opts: Json, sel: Str, pid: Nat): Str = selClearLoop(opts, sel, pid, 0, arrLen(opts))
+
+// ---------- 国策树（解锁/前置） ----------
+@impure
+fun policies(ent: Json): Json = jk(ent, "policies")
+@impure
+fun policyCount(ent: Json): Nat = arrLen(policies(ent))
+@impure
+fun policyRow(ent: Json, i: Nat): Json = arrAt(policies(ent), i)
+@impure
+fun policyAcquired(ent: Json, s: Str, i: Nat): Bool =
+    strHas(engField(s, F_FLAGS()), jstr(policyRow(ent, i), "id"))
+@impure
+fun policyReqLoop(ent: Json, s: Str, req: Json, i: Nat, n: Nat): Bool =
+    if (i >= n) true
+    else (if (!strHas(engField(s, F_FLAGS()), strOr(jsonStr(arrAt(req, i)), ""))) false else policyReqLoop(ent, s, req, (i + 1), n))
+@impure
+fun policyCanAcquire(ent: Json, s: Str, i: Nat): Bool =
+    policyReqLoop(ent, s, jk(policyRow(ent, i), "requires"), 0, arrLen(jk(policyRow(ent, i), "requires")))
+
+// ---------- 状态机构造 ----------
+@impure
+fun engInit(md: Json, ent: Json): Str {
+    var sy: Nat = timeStartYear(md)
+    var sm: Nat = timeStartMonth(md)
+    var sd: Nat = timeStartDay(md)
+    var s: Str = "idle"
+    s = catS(s, "|")
+    s = catS(s, resInit(ent))
+    s = catS(s, "0")
+    s = catS(s, "0")
+    s = catS(s, "0")
+    s = catS(s, "0")
+    s = catS(s, "0")
+    s = catS(s, "|")
+    s = catS(s, "|")
+    s = catS(s, "|")
+    s = catS(s, "L")
+    s = catS(s, "none")
+    s = catS(s, toStr(prevDayY(sy, sm, sd)))
+    s = catS(s, toStr(prevDayM(sm, sd)))
+    s = catS(s, toStr(prevDayD(sm, sd)))
+    s = catS(s, "0")
+    s = catS(s, "")
+    s = catS(s, "-1")
+    s
+}
+
+// 1/6 tick 开始：日期推进 + 资源产出与状态自然变化 + 开玩家操作阶段（ 自动开操作面板）
+@impure
+fun engTickStart(m: Json, s: Str): Str {
+    var ent: Json = modEnt(m)
+    if (strCmp(engField(s, F_PHASE()), "idle") != 0) s
+    else {
+        if (chapterCount(ent) == 0) engSet(s, F_PHASE(), "over")
+        else {
+            var st: Str = engSetNum(s, F_TICK(), engNum(s, F_TICK()) + 1)
+            st = engSetNum(st, F_INCHAP(), engNum(st, F_INCHAP()) + 1)
+            st = engDateNext(st)
+            st = applyEffects(ent, st, chapterPerTick(ent, engNum(st, F_CHAP())))
+            var apm: Nat = chapterAp(ent, engNum(st, F_CHAP()))
+            st = engSetNum(st, F_AP(), apm)
+            st = engSetNum(st, F_APMAX(), apm)
+            st = engSet(st, F_SEL(), "|")
+            st = engSet(st, F_PAGE(), "L")
+            st = engSet(st, F_PHASE(), "ops")
+            st = engSet(st, F_PANEL(), "ops")
+            objsDestroyTag("panel")
+            objsDestroyTag("view")
+            refreshTopbar(m, st)
+            renderOpsMain(m, st)
+            st
+        }
+    }
+}
+
+// 2/6 玩家操作阶段
+@impure
+fun engOpsOpen(m: Json, s: Str): Str {
+    var st: Str = engSet(engSet(s, F_PANEL(), "ops"), F_PAGE(), "L")
+    objsDestroyTag("panel")
+    renderOpsMain(m, st)
+    st
+}
+@impure
+fun engOpenOpsPage(m: Json, s: Str, pid: Nat): Str {
+    var st: Str = engSet(engSet(s, F_PANEL(), "ops"), F_PAGE(), toStr(pid))
+    objsDestroyTag("panel")
+    renderOpsPage(m, st, pid)
+    st
+}
+@impure
+fun engOpsBack(m: Json, s: Str): Str {
+    var st: Str = engSet(engSet(s, F_PANEL(), "ops"), F_PAGE(), "L")
+    objsDestroyTag("panel")
+    renderOpsMain(m, st)
+    st
+}
+@impure
+fun engOpsExec(m: Json, s: Str, pid: Nat, oi: Nat): Str {
+    var ent: Json = modEnt(m)
+    var pg: Json = arrAt(chapterOps(ent, engNum(s, F_CHAP())), pid)
+    var opts: Json = jk(pg, "options")
+    if (strCmp(engField(s, F_PHASE()), "ops") != 0) s
+    else (if (engNum(s, F_AP()) <= 0) s
+    else (if (strHas(engField(s, F_SEL()), selToken(pid, oi))) s
+    else {
+        var s2: Str = applyEffects(ent, s, jk(arrAt(opts, oi), "effects"))
+        s2 = engSet(s2, F_SEL(), toggleAdd(selClear(opts, engField(s2, F_SEL()), pid), selToken(pid, oi)))
+        s2 = engSetNum(s2, F_AP(), engNum(s2, F_AP()) - 1)
+        if (engNum(s2, F_AP()) <= 0) engOpsSettle(m, s2)
+        else (if (strCmp(engField(s2, F_PAGE()), "L") == 0) engOpenOpsPage(m, s2, pid) else engOpenOpsPage(m, s2, pid))
+    }))
+}
+@impure
+fun engOpsSkip(m: Json, s: Str): Str = engOpsSettle(m, s)
+// 3/6 事件触发阶段（队列按优先级；空队列直奔结算）
+@impure
+fun engOpsSettle(m: Json, s: Str): Str {
+    var ent: Json = modEnt(m)
+    objsDestroyTag("panel")
+    var st: Str = engSet(engSet(s, F_PHASE(), "events"), F_PANEL(), "none")
+    st = engSet(st, F_QUEUE(), buildQueue(ent, st))
+    if (queueEmpty(engField(st, F_QUEUE()))) engSettle(m, st) else engShowHead(m, st)
+}
+// 4/6 玩家处理事件
+@impure
+fun engShowHead(m: Json, s: Str): Str {
+    var ent: Json = modEnt(m)
+    var h: Str = qHead(engField(s, F_QUEUE()))
+    var st: Str = engSet(engSet(engSetNum(s, F_STEP(), 0), F_FIRED(), toggleAdd(engField(s, F_FIRED()), h)), F_PHASE(), "events")
+    objsDestroyTag("view")
+    renderView(m, evById(ent, h), 0)
+    st
+}
+@impure
+fun engViewClick(m: Json, s: Str, mx: Rat, my: Rat): Str {
+    var ent: Json = modEnt(m)
+    if (strCmp(engField(s, F_PHASE()), "events") != 0) s
+    else (if (strCmp(engField(s, F_CHEND()), "") != 0) engChEndAdvance(m, s)
+    else {
+        var ev: Json = evById(ent, qHead(engField(s, F_QUEUE())))
+        if (strCmp(jstr(ev, "kind"), "card") == 0) engCardHit(m, s, ev, mx, my)
+        else engStepLines(m, s, ev)
+    })
+}
+@impure
+fun engCardHit(m: Json, s: Str, ev: Json, mx: Rat, my: Rat): Str {
+    var n: Nat = arrLen(jk(ev, "options"))
+    if ((mx < CC_X()) || (mx > (CC_X() + CC_W()))) s
+    else {
+        var ri: Nat = cardRowHit(my, n)
+        if (ri >= n) s else engCardChoose(m, s, ev, ri)
+    }
+}
+@impure
+fun engCardChoose(m: Json, s: Str, ev: Json, i: Nat): Str {
+    var ent: Json = modEnt(m)
+    var s2: Str = applyEffects(ent, s, jk(arrAt(jk(ev, "options"), i), "effects"))
+    engAdvanceQueue(m, engSet(s2, F_QUEUE(), qPop(engField(s2, F_QUEUE()), jstr(ev, "id"))))
+}
+@impure
+fun engStepLines(m: Json, s: Str, ev: Json): Str {
+    var cnt: Nat = arrLen(jk(ev, "lines"))
+    var st: Str = engSetNum(s, F_STEP(), engNum(s, F_STEP()) + 1)
+    if (engNum(st, F_STEP()) >= cnt) engAdvanceQueue(m, engSet(st, F_QUEUE(), qPop(engField(st, F_QUEUE()), jstr(ev, "id"))))
+    else { renderView(m, ev, engNum(st, F_STEP())); st }
+}
+@impure
+fun engAdvanceQueue(m: Json, s: Str): Str =
+    if (queueEmpty(engField(s, F_QUEUE()))) engSettle(m, s) else engShowHead(m, s)
+
+// 5/6 结算（章末判定） -> 6/6 下一 tick（回合制：结算完直接开下一 tick）
+@impure
+fun engSettle(m: Json, s: Str): Str {
+    var ent: Json = modEnt(m)
+    var st: Str = engSet(s, F_PHASE(), "settle")
+    objsDestroyTag("view")
+    objsDestroyTag("panel")
+    var ci: Nat = engNum(st, F_CHAP())
+    if (chapterCount(ent) == 0) engSet(st, F_PHASE(), "over")
+    else {
+        var endOk: Bool = (engNum(st, F_INCHAP()) >= chapterTicks(ent, ci)) || whenHold(ent, st, endWhen(ent, ci))
+        if (endOk) engChapterEnd(m, st) else engTickStart(m, engSetNum(st, F_PHASE(), "idle"))
+    }
+}
+// 章末：效果 + dateJump 演出跳日期 + 章末超事件逐行演出 -> 下一章/篇终
+@impure
+fun engChapterEnd(m: Json, s: Str): Str {
+    var ent: Json = modEnt(m)
+    var ci: Nat = engNum(s, F_CHAP())
+    var st: Str = applyEffects(ent, s, endEffects(ent, ci))
+    var jy: Nat = endJumpY(ent, ci)
+    if (jy != 0) { st = engDateJump(st, jy, endJumpM(ent, ci), endJumpD(ent, ci)) } else null
+    var nx: Str = endNext(ent, ci)
+    var fin: Bool = (strCmp(nx, "-1") == 0) || (natOr(parseNat(nx), 0) >= chapterCount(ent))
+    var ls: Json = endLines(ent, ci)
+    st = engSet(st, F_CHNEXT(), if (fin) "-1" else nx)
+    st = engSetNum(st, F_STEP(), 0)
+    st = engSet(st, F_CHEND(), if (arrLen(ls) > 0) "1" else "")
+    st = engSet(st, F_PHASE(), "events")
+    if (arrLen(ls) == 0) engChEndFinish(m, st)
+    else { objsDestroyTag("view"); objsDestroyTag("panel"); renderChEnd(m, ls, 0); st }
+}
+@impure
+fun engChEndAdvance(m: Json, s: Str): Str {
+    var ent: Json = modEnt(m)
+    var ls: Json = endLines(ent, engNum(s, F_CHAP()))
+    var st: Str = engSetNum(s, F_STEP(), engNum(s, F_STEP()) + 1)
+    if (engNum(st, F_STEP()) >= arrLen(ls)) engChEndFinish(m, st)
+    else { renderChEnd(m, ls, engNum(st, F_STEP())); st }
+}
+@impure
+fun engChEndFinish(m: Json, s: Str): Str {
+    var st: Str = engSet(engSet(s, F_CHEND(), ""), F_STEP(), "0")
+    var nx: Str = engField(st, F_CHNEXT())
+    objsDestroyTag("view")
+    if (strCmp(nx, "-1") == 0) engSet(st, F_PHASE(), "over")
+    else {
+        var s2: Str = engSetNum(engSetNum(engSet(st, F_PHASE(), "idle"), F_CHAP(), natOr(parseNat(nx), 0)), F_INCHAP(), 0)
+        engTickStart(m, s2)
+    }
+}
+// 国策树点击：前置满足且未行 -> 应用效果并标记
+@impure
+fun engPolicyAcquire(m: Json, s: Str, i: Nat): Str {
+    var ent: Json = modEnt(m)
+    var st: Str = engSet(s, F_PANEL(), "policy")
+    if (policyAcquired(ent, st, i)) st
+    else (if (!policyCanAcquire(ent, st, i)) st
+    else {
+        var s2: Str = applyEffects(ent, st, jk(policyRow(ent, i), "effects"))
+        s2 = engSet(s2, F_FLAGS(), toggleAdd(engField(s2, F_FLAGS()), jstr(policyRow(ent, i), "id")))
+        objsDestroyTag("panel")
+        renderPolicyPanel(m, s2)
+        s2
+    })
+}

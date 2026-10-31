@@ -112,3 +112,13 @@ fun strHas(s: Str, p: Str): Bool = when(strIndexOf(s, p)) { is Some(_) => true; 
 fun toggleOn(toggles: Str, id: Str): Bool = strHas(toggles, wrapId(id))
 fun toggleAdd(toggles: Str, id: Str): Str = concat(toggles, concat(id, "|"))
 fun toggleDel(toggles: Str, id: Str): Str = strReplace(toggles, wrapId(id), "|")
+
+fun labelOr(s: Str, d: Str): Str = if (strCmp(s, "") == 0) d else s
+@impure
+fun timeStartDay(md: Json): Rat = jnum(jk(md, "time"), "startDay")
+@impure
+fun uiOps(ent: Json): Str = labelOr(jstr(jk(ent, "ui"), "ops"), "操作")
+@impure
+fun uiPolicy(ent: Json): Str = labelOr(jstr(jk(ent, "ui"), "policy"), "国策")
+@impure
+fun uiGameOver(ent: Json): Str = labelOr(jstr(jk(ent, "ui"), "gameOver"), "终局")

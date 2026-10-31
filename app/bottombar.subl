@@ -1,129 +1,219 @@
-// bottombar.subl —— 底栏 + 通用面板（fixed；一切文案来自模组 entities.ui/-实体表）
-// 四个图标按钮（文案 mod.ui 驱动，缺失回退默认标签）：基本政策（开关型）/ 国家政策（树状解锁）/ 国家属性（数值面板）/ 控制地块（地块列表）。
-// 面板内容全部由模组 JSON 驱动：本体只提供通用面板组件与数据绑定，不写具体政策/属性内容。
-// 派系=影响政策解锁：面板把 faction 渲染为标签，factionUnlocks 留数据位（mods.subl）。
-
-fun BBAR_Y(): Rat = 496.0
-fun BBAR_H(): Rat = 44.0
+// bottombar.subl —— 底栏四面板按钮（操作/国策/国家属性/控制地块）+ 面板与操作页
+// 架构决策（2026-10-31）：「操作」= 模组提供的操作页按钮 -> 每页一组 radio，点选项消耗 1 行动点；
+// 「国策」= 完全数据驱动国策树（前置/解锁）；「国家属性」= 资源总览（值+产出）；「控制地块」= t85 现状。
+// 行内容全部来自 entities.json；本体只提供几何与交互框架。
 fun BTN_Y(): Rat = 504.0
-fun BTN_H(): Rat = 32.0
 fun BTN_W(): Rat = 208.0
-fun BTN_DX(): Rat = 224.0
+fun BTN_H(): Rat = 32.0
 fun BTN_N(): Nat = 4
-fun COL_BBAR(): Str = "#1B2430"
-fun COL_BTN(): Str = "#25313F"
-
-// 面板几何
 fun PN_X(): Rat = 280.0
 fun PN_Y(): Rat = 80.0
 fun PN_W(): Rat = 420.0
-fun PN_TITLE_H(): Rat = 44.0
-fun PN_BODY_H(): Rat = 320.0
-fun PN_ROW_Y0(): Rat = 140.0
-fun PN_ROW_DY(): Rat = 30.0
-fun PN_Z(): Rat = 20.0
-fun COL_PN_T(): Str = "#28394C"
-fun COL_PN_B(): Str = "#141C26"
+fun ROW_Y0(): Rat = 152.0
+fun ROW_DY(): Rat = 36.0
+fun PN_HEX(): Str = "#28394C"
+fun BODY_HEX(): Str = "#141C26"
+fun BTN_HEX(): Str = "#25313F"
+fun COL_SKIP(): Str = "#C8A24B"
 
-fun btnX(i: Nat): Rat = (16.0 + (toRat(i) * BTN_DX()))
-fun rowYOf(i: Nat): Rat = (PN_ROW_Y0() + (toRat(i) * PN_ROW_DY()))
-fun btnKind(i: Nat): Str =
-    if (i == 0) "basic"
-    else (if (i == 1) "tree"
-    else (if (i == 2) "attrs" else "blocks"))
+fun btnX(i: Nat): Rat = if (i == 0) 16.0 else (if (i == 1) 240.0 else (if (i == 2) 464.0 else 688.0))
+fun btnKind(i: Nat): Str = if (i == 0) "ops" else (if (i == 1) "policy" else (if (i == 2) "attrs" else "blocks"))
 @impure
-fun btnLabel(ent: Json, i: Nat): Str =
-    if (i == 0) uiBasic(ent)
-    else (if (i == 1) uiTree(ent)
-    else (if (i == 2) uiAttrs(ent) else uiBlocks(ent)))
+fun btnLabel(m: Json, i: Nat): Str =
+    if (i == 0) uiOps(modEnt(m))
+    else (if (i == 1) uiPolicy(modEnt(m)) else (if (i == 2) uiAttrs(modEnt(m)) else uiBlocks(modEnt(m))))
+fun btnHit(mx: Rat, my: Rat, i: Nat): Bool =
+    if ((mx >= btnX(i)) && (mx <= (btnX(i) + BTN_W()))) ((my >= BTN_Y()) && (my <= (BTN_Y() + BTN_H()))) else false
+@impure
+fun whichBtnLoop(mx: Rat, my: Rat, i: Nat, n: Nat): Nat =
+    if (i >= n) n else (if (btnHit(mx, my, i)) i else whichBtnLoop(mx, my, (i + 1), n))
+@impure
+fun whichBtn(mx: Rat, my: Rat): Nat = whichBtnLoop(mx, my, 0, BTN_N())
 
-// 屏幕坐标命中（fixed UI 所以就是鼠标坐标）
-fun btnHit(mx: Rat, my: Rat, i: Nat): Bool = ((mx >= btnX(i)) && (mx <= (btnX(i) + BTN_W()))) && ((my >= BTN_Y()) && (my <= (BTN_Y() + BTN_H())))
-@impure
-fun whichBtnLoop(mx: Rat, my: Rat, i: Nat): Nat =
-    if (i >= BTN_N()) BTN_N()
-    else (if (btnHit(mx, my, i)) i else whichBtnLoop(mx, my, (i + 1)))
-@impure
-fun whichBtn(mx: Rat, my: Rat): Nat = whichBtnLoop(mx, my, 0)
-
-// 底栏（标签文案来自模组 entities.ui；构建时面板初始为「未开」）
+// ---------- 底栏四按钮（文案与几何均模组可配：entities.ui 标签） ----------
 @impure
 fun buildBottombar(m: Json): Null {
-    var ent: Json = modEnt(m)
-    var bar: Any = addRectT(960.0, BBAR_H(), 0.0, BBAR_Y(), COL_BBAR(), "ui", 10.0)
-    buildButtonsLoop(ent, 0)
+    buildButtonsLoop(m, 0, BTN_N())
     null
 }
 @impure
-fun buildButtonsLoop(ent: Json, i: Nat): Null =
-    if (i >= BTN_N()) null
+fun buildButtonsLoop(m: Json, i: Nat, n: Nat): Null =
+    if (i >= n) null
     else {
-        var x: Rat = btnX(i)
-        var lbl: Str = btnLabel(ent, i)
-        var r: Any = addRectT(BTN_W(), BTN_H(), x, BTN_Y(), COL_BTN(), "ui", 11.0)
-        var t: Any = addTextT(lbl, (x + 60.0), (BTN_Y() + 9.0), 14.0, 400, COL_SUB(), "ui", true, 12.0)
-        buildButtonsLoop(ent, (i + 1))
+        var br: Any = addRectT(BTN_W(), BTN_H(), btnX(i), BTN_Y(), BTN_HEX(), "ui", 10.0)
+        var bt: Any = addTextT(btnLabel(m, i), (btnX(i) + 60.0), 513.0, 14.0, 400, "#F0F4F8", "ui", true, 12.0)
+        buildButtonsLoop(m, (i + 1), n)
     }
 
-// ---------- 通用面板组件 ----------
+// ---------- 通用面板框架（title + body） ----------
 @impure
-fun renderPanel(m: Json, kind: Str, toggles: Str): Null {
-    var ent: Json = modEnt(m)
-    var title: Str = panelTitle(ent, kind)
-    var frame: Any = addRectT(PN_W(), PN_TITLE_H(), PN_X(), PN_Y(), COL_PN_T(), "panel", PN_Z())
-    var body: Any = addRectT(PN_W(), PN_BODY_H(), PN_X(), (PN_Y() + PN_TITLE_H()), COL_PN_B(), "panel", PN_Z())
-    var t: Any = addTextT(title, (PN_X() + 16.0), (PN_Y() + 11.0), 17.0, 700, COL_TITLE(), "panel", true, (PN_Z() + 1.0))
-    var rows: Nat = panelRowCount(ent, kind)
-    renderRowsLoop(m, kind, toggles, rows, 0)
-    null
+fun panelHead(kind: Str): Any {
+    var head: Any = addRectT(PN_W(), 44.0, PN_X(), PN_Y(), PN_HEX(), "panel", 20.0)
+    var ht: Any = addTextT(kind, (PN_X() + 18.0), (PN_Y() + 12.0), 16.0, 700, "#F0F4F8", "panel", true, 21.0)
+    head
 }
 @impure
-fun panelRowCount(ent: Json, kind: Str): Nat =
-    if (strCmp(kind, "basic") == 0) arrLen(jk(ent, "policiesBasic"))
-    else (if (strCmp(kind, "tree") == 0) arrLen(jk(ent, "policiesTree"))
-    else (if (strCmp(kind, "attrs") == 0) arrLen(jk(ent, "attrs")) else arrLen(jk(ent, "blocks"))))
-
+fun panelBody(): Any = addRectT(PN_W(), 320.0, PN_X(), (PN_Y() + 44.0), BODY_HEX(), "panel", 20.0)
 @impure
-fun renderRowsLoop(m: Json, kind: Str, toggles: Str, n: Nat, i: Nat): Null =
+fun panelRowHitLoop(y: Rat, dy: Rat, my: Rat, i: Nat, n: Nat): Nat =
+    if (i >= n) n
+    else (if ((my >= y) && (my < (y + dy))) i else panelRowHitLoop((y + dy), dy, my, (i + 1), n))
+@impure
+fun panelRowHit(my: Rat, n: Nat): Nat = panelRowHitLoop(ROW_Y0(), ROW_DY(), my, 0, n)
+
+// ---------- 国策 / 属性 / 地块 面板 ----------
+@impure
+fun renderPanelKind(m: Json, s: Str, kind: Str): Str {
+    var ent: Json = modEnt(m)
+    var h1: Any = panelHead(if (strCmp(kind, "policy") == 0) uiPolicy(ent) else (if (strCmp(kind, "attrs") == 0) uiAttrs(ent) else uiBlocks(ent)))
+    var b1: Any = panelBody()
+    if (strCmp(kind, "policy") == 0) renderPolicyRows(m, s, 0, policyCount(ent))
+    else { if (strCmp(kind, "attrs") == 0) renderAttrRows(m, s, 0, resCount(ent)) else renderBlocksRows(m, 0, blockCount(ent)) }
+    engSet(s, F_PANEL(), kind)
+}
+@impure
+fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat): Null =
+    if (i >= n) null
+    else {
+        var v: Nat = resStrGet(engField(s, F_RES()), i)
+        var p: Nat = resProduce(modEnt(m), i)
+        var base: Str = concat(concat(resName(modEnt(m), i), "  "), toStr(v))
+        var txt: Str = concat(base, concat("（产出 ", concat(toStr(p), "/天）")))
+        var rt: Any = addTextT(txt, (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(i))), 14.0, 400, "#D6DEE8", "panel", true, 21.0)
+        renderAttrRows(m, s, (i + 1), n)
+    }
+@impure
+fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat): Null =
     if (i >= n) null
     else {
         var ent: Json = modEnt(m)
-        var row: Str = panelRowText(ent, kind, toggles, i)
-        var o: Any = addTextT(row, (PN_X() + 16.0), rowYOf(i), 14.0, 400, COL_TITLE(), "panel", true, (PN_Z() + 1.0))
-        renderRowsLoop(m, kind, toggles, n, (i + 1))
+        var mark: Str = if (policyAcquired(ent, s, i)) "[已行] " else (if (policyCanAcquire(ent, s, i)) "[可解] " else "[锁定] ")
+        var nm: Str = jstr(policyRow(ent, i), "name")
+        var txt: Str = concat(concat(mark, nm), policyReqText(ent, i))
+        var rt: Any = addTextT(txt, (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(i))), 14.0, 400, "#D6DEE8", "panel", true, 21.0)
+        renderPolicyRows(m, s, (i + 1), n)
+    }
+@impure
+fun policyReqText(ent: Json, i: Nat): Str =
+    if (arrLen(jk(policyRow(ent, i), "requires")) == 0) ""
+    else concat("  前置：", reqNamesLoop(ent, jk(policyRow(ent, i), "requires"), 0, arrLen(jk(policyRow(ent, i), "requires")), ""))
+@impure
+fun reqNamesLoop(ent: Json, req: Json, i: Nat, n: Nat, acc: Str): Str =
+    if (i >= n) acc
+    else {
+        var nm: Str = lookupName(policies(ent), strOr(jsonStr(arrAt(req, i)), ""))
+        reqNamesLoop(ent, req, (i + 1), n, if (i == 0) nm else concat(concat(acc, "、"), nm))
+    }
+@impure
+fun renderBlocksRows(m: Json, i: Nat, n: Nat): Null =
+    if (i >= n) null
+    else {
+        var ent: Json = modEnt(m)
+        var nm: Str = jstr(arrAt(jk(ent, "blocks"), i), "name")
+        var ow: Str = countryName(ent, jstr(arrAt(jk(ent, "blocks"), i), "owner"))
+        var txt: Str = concat(concat(nm, "  归属 "), ow)
+        var rt: Any = addTextT(txt, (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(i))), 14.0, 400, "#D6DEE8", "panel", true, 21.0)
+        renderBlocksRows(m, (i + 1), n)
+    }
+@impure
+fun policyPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
+    if ((mx < PN_X()) || (mx > (PN_X() + PN_W()))) s
+    else {
+        var n: Nat = policyCount(modEnt(m))
+        var ri: Nat = panelRowHit(my, n)
+        if (ri < n) engPolicyAcquire(m, s, ri) else s
+    }
+}
+
+// ---------- 操作面板：页列表（本体按章切换内容） ----------
+@impure
+fun renderOpsMain(m: Json, s: Str): Null {
+    var ent: Json = modEnt(m)
+    var ci: Nat = engNum(s, F_CHAP())
+    var ops: Json = chapterOps(ent, ci)
+    var h1: Any = panelHead(opsMainTitle(ent, ci, s))
+    var b1: Any = panelBody()
+    renderOpsMainRows(m, s, 0, arrLen(ops))
+    var rows: Nat = arrLen(ops)
+    var skip: Any = addTextT("结束操作（不操作，直接结算）", (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(rows))), 13.0, 400, COL_SKIP(), "panel", true, 21.0)
+    null
+}
+fun opsMainTitle(ent: Json, ci: Nat, s: Str): Str =
+    concat(concat(concat(chapterAct(ent, ci), " · "), chapterName(ent, ci)), opsApText(s))
+fun opsApText(s: Str): Str = concat(concat("  行动点 ", toStr(engNum(s, F_AP()))), concat(" / ", toStr(engNum(s, F_APMAX()))))
+@impure
+fun renderOpsMainRows(m: Json, s: Str, i: Nat, n: Nat): Null =
+    if (i >= n) null
+    else {
+        var ent: Json = modEnt(m)
+        var pg: Json = arrAt(chapterOps(ent, engNum(s, F_CHAP())), i)
+        var txt: Str = concat(concat("▸ ", jstr(pg, "name")), concat("  ", jstr(pg, "desc")))
+        var rt: Any = addTextT(txt, (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(i))), 14.0, 400, "#D6DEE8", "panel", true, 21.0)
+        renderOpsMainRows(m, s, (i + 1), n)
     }
 
-// 行文案：根据 kind 从模组实体表组装（派系标签 = 解锁数据位的可视化）
+// ---------- 操作页：头部状态条（行动点余量 + 本操作相关即时状态） + radio 组 ----------
 @impure
-fun panelRowText(ent: Json, kind: Str, toggles: Str, i: Nat): Str =
-    if (strCmp(kind, "basic") == 0) basicRowText(ent, toggles, arrAt(jk(ent, "policiesBasic"), i))
-    else (if (strCmp(kind, "tree") == 0) treeRowText(ent, arrAt(jk(ent, "policiesTree"), i))
-    else (if (strCmp(kind, "attrs") == 0) attrRowText(arrAt(jk(ent, "attrs"), i))
-    else blockRowText(ent, arrAt(jk(ent, "blocks"), i))))
+fun renderOpsPage(m: Json, s: Str, pid: Nat): Null {
+    var ent: Json = modEnt(m)
+    var ci: Nat = engNum(s, F_CHAP())
+    var pg: Json = arrAt(chapterOps(ent, ci), pid)
+    var h1: Any = panelHead(jstr(pg, "name"))
+    var strip: Any = addRectT(PN_W(), 24.0, PN_X(), (PN_Y() + 44.0), "#1B2430", "panel", 20.0)
+    var st1: Any = addTextT(opsStripText(m, s, pg), (PN_X() + 14.0), (PN_Y() + 50.0), 12.0, 400, "#9FB3C7", "panel", true, 21.0)
+    var b1: Any = panelBody()
+    renderOpsPageRows(m, s, pid, pg, 0, arrLen(jk(pg, "options")))
+    var rows: Nat = arrLen(jk(pg, "options"))
+    var back: Any = addTextT("返回操作页", (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(rows))), 13.0, 400, "#8FA3B8", "panel", true, 21.0)
+    null
+}
+@impure
+fun opsStripText(m: Json, s: Str, pg: Json): Str {
+    var ap: Str = concat(concat(concat("行动点 ", toStr(engNum(s, F_AP()))), " / "), toStr(engNum(s, F_APMAX())))
+    var mk: Str = concat(ap, opsStatusLoop(m, s, jk(pg, "status"), 0, arrLen(jk(pg, "status")), ""))
+    mk
+}
+@impure
+fun opsStatusLoop(m: Json, s: Str, st: Json, i: Nat, n: Nat, acc: Str): Str =
+    if (i >= n) acc
+    else {
+        var ent: Json = modEnt(m)
+        var rid: Str = strOr(jsonStr(arrAt(st, i)), "")
+        var part: Str = concat(concat(concat(" · ", lookupName(jk(ent, "resources"), rid)), " "), toStr(resValById(ent, s, rid)))
+        opsStatusLoop(m, s, st, (i + 1), n, concat(acc, part))
+    }
+@impure
+fun renderOpsPageRows(m: Json, s: Str, pid: Nat, pg: Json, i: Nat, n: Nat): Null =
+    if (i >= n) null
+    else {
+        var ent: Json = modEnt(m)
+        var opts: Json = jk(pg, "options")
+        var sel: Bool = strHas(engField(s, F_SEL()), selToken(pid, i))
+        var dot: Str = if (sel) "● " else "○ "
+        var txt: Str = concat(concat(concat(dot, jstr(arrAt(opts, i), "name")), "  "), jstr(arrAt(opts, i), "desc"))
+        var rt: Any = addTextT(txt, (PN_X() + 18.0), (ROW_Y0() + (ROW_DY() * toRat(i))), 14.0, 400, "#D6DEE8", "panel", true, 21.0)
+        renderOpsPageRows(m, s, pid, pg, (i + 1), n)
+    }
 
+// ---------- 操作面板点击分派 ----------
 @impure
-fun basicRowText(ent: Json, toggles: Str, row: Json): Str = concat(concat(concat(jstr(row, "name"), "  "), if (toggleOn(toggles, jstr(row, "id"))) "开" else "关"), basicFacTag(ent, jstr(row, "faction")))
-@impure
-fun basicFacTag(ent: Json, fid: Str): Str = if (strCmp(fid, "") == 0) "" else concat("  【", concat(factionName(ent, fid), "】"))
-@impure
-fun treeRowText(ent: Json, row: Json): Str = concat(concat(jstr(row, "name"), "  「前置："), concat(treeReqName(ent, jstr(row, "requires")), concat(" · 派系：", concat(treeFacName(ent, jstr(row, "faction")), "」"))))
-@impure
-fun treeReqName(ent: Json, req: Str): Str = if (strCmp(req, "") == 0) "无前置" else policyNameById(ent, req)
-@impure
-fun treeFacName(ent: Json, fid: Str): Str = if (strCmp(fid, "") == 0) "无派系" else factionName(ent, fid)
-@impure
-fun attrRowText(row: Json): Str = concat(concat(concat(jstr(row, "name"), "  "), toStr(jnum(row, "value"))), concat(" / ", toStr(jnum(row, "max"))))
-@impure
-fun blockRowText(ent: Json, row: Json): Str = concat(concat(jstr(row, "name"), "  归属 "), countryName(ent, jstr(row, "owner")))
-
-// 开关行点击：命中行 -> 翻转该基本政策开关态（数据位见 mods.subl）
-@impure
-fun panelRowHit(my: Rat, i: Nat, n: Nat): Nat =
-    if (i >= n) n
-    else (if ((my >= rowYOf(i)) && (my < (rowYOf(i) + PN_ROW_DY()))) i else panelRowHit(my, (i + 1), n))
-@impure
-fun flipToggleRow(ent: Json, toggles: Str, i: Nat): Str = flipToggleRowOf(jstr(arrAt(jk(ent, "policiesBasic"), i), "id"), toggles)
-@impure
-fun flipToggleRowOf(pid: Str, toggles: Str): Str =
-    if (strCmp(pid, "") == 0) toggles
-    else (if (toggleOn(toggles, pid)) toggleDel(toggles, pid) else toggleAdd(toggles, pid))
+fun opsPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
+    var ent: Json = modEnt(m)
+    var ops: Json = chapterOps(ent, engNum(s, F_CHAP()))
+    if ((mx < PN_X()) || (mx > (PN_X() + PN_W()))) s
+    else {
+        if (strCmp(engField(s, F_PAGE()), "L") == 0) {
+            var rows: Nat = arrLen(ops)
+            var ri: Nat = panelRowHit(my, (rows + 1))
+            if (ri < rows) engOpenOpsPage(m, s, ri)
+            else { if (ri == rows) engOpsSkip(m, s) else s }
+        } else {
+            var pid: Nat = natOr(parseNat(engField(s, F_PAGE())), 0)
+            var opts: Json = jk(arrAt(ops, pid), "options")
+            var rows: Nat = arrLen(opts)
+            var ri: Nat = panelRowHit(my, (rows + 1))
+            if (ri < rows) engOpsExec(m, s, pid, ri)
+            else { if (ri == rows) engOpsBack(m, s) else s }
+        }
+    }
+}
