@@ -25,6 +25,8 @@ fun ROW_W(): Rat = 1792.0
 fun ROW_Y0(): Rat = 160.0
 fun ROW_DY(): Rat = 112.0
 fun ROW_H(): Rat = 88.0
+fun ROWS_FIT(): Nat = 7
+fun rowYOf(i: Nat, off: Nat): Rat = (ROW_Y0() + (ROW_DY() * toRat((i - off))))
 
 // ---------- MD3 深色 tonal 色板 ----------
 fun FS_HEX(): Str = "#1F2327"
@@ -58,7 +60,7 @@ fun buildBottombar(m: Json): Null { buildNav(m, "none"); null }
 @impure
 fun buildNav(m: Json, panel: Str): Null {
     objsDestroyTag("ui-nav")
-    var bar: Any = addRectT(FS_W(), NAV_H(), 0.0, NAV_Y(), NAV_HEX(), "ui-nav", 10.0)
+    var bar: Any = addRectT(FS_W(), NAV_H(), 0.0, NAV_Y(), NAV_HEX(), "ui-nav", 35.0)
     buildNavItems(m, panel, 0, BTN_N())
     null
 }
@@ -81,21 +83,21 @@ fun buildNavItems(m: Json, panel: Str, i: Nat, n: Nat): Null =
 @impure
 fun drawNavIcon(i: Nat, cx: Rat, col: Str): Null {
     if (i == 0) {
-        var a1: Any = addRectT(14.0, 14.0, (cx - 21.0), 1018.0, col, "ui-nav", 14.0)
-        var a2: Any = addRectT(14.0, 14.0, (cx + 7.0), 1018.0, col, "ui-nav", 14.0)
-        var a3: Any = addRectT(14.0, 14.0, (cx - 21.0), 1036.0, col, "ui-nav", 14.0)
-        var a4: Any = addRectT(14.0, 14.0, (cx + 7.0), 1036.0, col, "ui-nav", 14.0)
+        var a1: Any = addRectT(14.0, 14.0, (cx - 21.0), 1018.0, col, "ui-nav", 36.0)
+        var a2: Any = addRectT(14.0, 14.0, (cx + 7.0), 1018.0, col, "ui-nav", 36.0)
+        var a3: Any = addRectT(14.0, 14.0, (cx - 21.0), 1036.0, col, "ui-nav", 36.0)
+        var a4: Any = addRectT(14.0, 14.0, (cx + 7.0), 1036.0, col, "ui-nav", 36.0)
     } else { if (i == 1) {
-        var b1: Any = addRectT(8.0, 12.0, (cx - 15.0), 1042.0, col, "ui-nav", 14.0)
-        var b2: Any = addRectT(8.0, 26.0, (cx - 5.0), 1028.0, col, "ui-nav", 14.0)
-        var b3: Any = addRectT(8.0, 40.0, (cx + 5.0), 1014.0, col, "ui-nav", 14.0)
+        var b1: Any = addRectT(8.0, 12.0, (cx - 15.0), 1042.0, col, "ui-nav", 36.0)
+        var b2: Any = addRectT(8.0, 26.0, (cx - 5.0), 1028.0, col, "ui-nav", 36.0)
+        var b3: Any = addRectT(8.0, 40.0, (cx + 5.0), 1014.0, col, "ui-nav", 36.0)
     } else { if (i == 2) {
-        var c1: Any = addRectT(30.0, 7.0, (cx - 15.0), 1018.0, col, "ui-nav", 14.0)
-        var c2: Any = addRectT(30.0, 7.0, (cx - 15.0), 1032.0, col, "ui-nav", 14.0)
-        var c3: Any = addRectT(30.0, 7.0, (cx - 15.0), 1046.0, col, "ui-nav", 14.0)
+        var c1: Any = addRectT(30.0, 7.0, (cx - 15.0), 1018.0, col, "ui-nav", 36.0)
+        var c2: Any = addRectT(30.0, 7.0, (cx - 15.0), 1032.0, col, "ui-nav", 36.0)
+        var c3: Any = addRectT(30.0, 7.0, (cx - 15.0), 1046.0, col, "ui-nav", 36.0)
     } else {
-        var d1: Any = addRectT(22.0, 22.0, (cx - 16.0), 1016.0, col, "ui-nav", 14.0)
-        var d2: Any = addRectT(22.0, 22.0, (cx - 4.0), 1032.0, col, "ui-nav", 14.0)
+        var d1: Any = addRectT(22.0, 22.0, (cx - 16.0), 1016.0, col, "ui-nav", 36.0)
+        var d2: Any = addRectT(22.0, 22.0, (cx - 4.0), 1032.0, col, "ui-nav", 36.0)
     } } }
     null
 }
@@ -103,7 +105,7 @@ fun drawNavIcon(i: Nat, cx: Rat, col: Str): Null {
 // ---------- 全屏界面框架（MD3：底栏之上整屏 + 左上返回按钮） ----------
 @impure
 fun fsFrame(kind: Str): Null {
-    var bg: Any = addRectT(FS_W(), FS_H(), 0.0, 0.0, FS_HEX(), "panel", 30.0)
+    var bg: Any = addRectT(FS_W(), 1080.0, 0.0, 0.0, FS_HEX(), "panel", 30.0)
     var bb2: Any = addRoundRect(BACK_W(), BACK_H(), BACK_X(), BACK_Y(), ROW_SEL(), "panel", 32.0, 20.0)
     var bt: Any = addTextT("‹ 返回地图", 84.0, 50.0, 22.0, 400, TXT_HEX(), "panel", true, 33.0)
     var tt: Any = addTextT(kind, TITLE_X(), TITLE_Y(), 34.0, 700, TXT_HEX(), "panel", true, 33.0)
@@ -117,44 +119,54 @@ fun panelRowHitLoop(y: Rat, dy: Rat, my: Rat, i: Nat, n: Nat): Nat =
     if (i >= n) n
     else (if ((my >= y) && (my < (y + dy))) i else panelRowHitLoop((y + dy), dy, my, (i + 1), n))
 @impure
-fun panelRowHit(my: Rat, n: Nat): Nat = panelRowHitLoop(ROW_Y0(), ROW_DY(), my, 0, n)
+fun panelRowHit(my: Rat, n: Nat, off: Nat): Nat = (off + panelRowHitLoop(ROW_Y0(), ROW_DY(), my, 0, n))
 fun rowInRowX(mx: Rat): Bool = if ((mx >= ROW_X()) && (mx <= (ROW_X() + ROW_W()))) true else false
 
 // ---------- 国策 / 属性 / 地块 全屏界面（MD3 列表） ----------
 @impure
-fun renderPanelKind(m: Json, s: Str, kind: Str): Str {
+fun renderPanelKind(m: Json, s: Str, kind: Str): Str = renderPanelBody(m, engSetNum(s, F_SCROLL(), 0), kind)
+
+// 面板内滚轮：保留滚动量局部刷新（不重置）
+@impure
+fun renderPanelRefresh(m: Json, s: Str, kind: Str): Str = renderPanelBody(m, s, kind)
+
+@impure
+fun renderPanelBody(m: Json, s: Str, kind: Str): Str {
     var ent: Json = modEnt(m)
+    var off: Nat = engNum(s, F_SCROLL())
     objsDestroyTag("panel")
     fsFrame(if (strCmp(kind, "policy") == 0) uiPolicy(ent) else (if (strCmp(kind, "attrs") == 0) uiAttrs(ent) else uiBlocks(ent)))
-    if (strCmp(kind, "policy") == 0) renderPolicyRows(m, s, 0, policyCount(ent))
-    else { if (strCmp(kind, "attrs") == 0) renderAttrRows(m, s, 0, resCount(ent)) else renderBlocksRows(m, 0, blockCount(ent)) }
+    var n: Nat = if (strCmp(kind, "policy") == 0) policyCount(ent) else (if (strCmp(kind, "attrs") == 0) resCount(ent) else arrLen(jk(ent, "blocks")))
+    if (strCmp(kind, "policy") == 0) renderPolicyRows(m, s, off, n, off)
+    else { if (strCmp(kind, "attrs") == 0) renderAttrRows(m, s, off, n, off) else renderBlocksRows(m, off, n, off) }
     return engSet(s, F_PANEL(), kind)
 }
+
 @impure
-fun fsRow(i: Nat, sel: Bool): Any = addRoundRect(ROW_W(), ROW_H(), ROW_X(), (ROW_Y0() + (ROW_DY() * toRat(i))), if (sel) ROW_SEL() else ROW_HEX(), "panel", 31.0, 20.0)
+fun fsRow(i: Nat, off: Nat, sel: Bool): Any = addRoundRect(ROW_W(), ROW_H(), ROW_X(), rowYOf(i, off), if (sel) ROW_SEL() else ROW_HEX(), "panel", 31.0, 20.0)
 @impure
-fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat): Null =
-    if (i >= n) null
+fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
+    if ((i >= n) || ((rowYOf(i, off) + ROW_H()) > NAV_Y())) null
     else {
         var v: Nat = resStrGet(engField(s, F_RES()), i)
         var p: Nat = resProduce(modEnt(m), i)
-        var row: Any = fsRow(i, false)
-        var nm: Any = addTextT(concat(resName(modEnt(m), i), toStr(v)), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
-        var sub: Any = addTextT(concat("产出 ", concat(toStr(p), "/天")), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
-        renderAttrRows(m, s, (i + 1), n)
+        var row: Any = fsRow(i, off, false)
+        var nm: Any = addTextT(concat(resName(modEnt(m), i), toStr(v)), (ROW_X() + 32.0), (rowYOf(i, off) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
+        var sub: Any = addTextT(concat("产出 ", concat(toStr(p), "/天")), (ROW_X() + 32.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
+        renderAttrRows(m, s, (i + 1), n, off)
     }
 @impure
-fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat): Null =
-    if (i >= n) null
+fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
+    if ((i >= n) || ((rowYOf(i, off) + ROW_H()) > NAV_Y())) null
     else {
         var ent: Json = modEnt(m)
         var acq: Bool = policyAcquired(ent, s, i)
         var mark: Str = if (acq) "已行" else (if (policyCanAcquire(ent, s, i)) "可解" else "锁定")
         var nm: Str = jstr(policyRow(ent, i), "name")
-        var row: Any = fsRow(i, acq)
-        var mt: Any = addTextT(concat(concat(mark, " "), nm), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 14.0), 28.0, 600, if (acq) PRIMARY_HEX() else TXT_HEX(), "panel", true, 32.0)
-        var st: Any = addTextT(policyReqText(ent, i), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
-        renderPolicyRows(m, s, (i + 1), n)
+        var row: Any = fsRow(i, off, acq)
+        var mt: Any = addTextT(concat(concat(mark, " "), nm), (ROW_X() + 32.0), (rowYOf(i, off) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
+        var st: Any = addTextT(policyReqText(ent, i), (ROW_X() + 32.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
+        renderPolicyRows(m, s, (i + 1), n, off)
     }
 @impure
 fun policyReqText(ent: Json, i: Nat): Str =
@@ -168,22 +180,22 @@ fun reqNamesLoop(ent: Json, req: Json, i: Nat, n: Nat, acc: Str): Str =
         reqNamesLoop(ent, req, (i + 1), n, if (i == 0) nm else concat(concat(acc, "、"), nm))
     }
 @impure
-fun renderBlocksRows(m: Json, i: Nat, n: Nat): Null =
-    if (i >= n) null
+fun renderBlocksRows(m: Json, i: Nat, n: Nat, off: Nat): Null =
+    if ((i >= n) || ((rowYOf(i, off) + ROW_H()) > NAV_Y())) null
     else {
         var ent: Json = modEnt(m)
         var nm: Str = jstr(arrAt(jk(ent, "blocks"), i), "name")
         var ow: Str = countryName(ent, jstr(arrAt(jk(ent, "blocks"), i), "owner"))
-        var row: Any = fsRow(i, false)
-        var rt: Any = addTextT(nm, (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
-        var st: Any = addTextT(concat("归属 ", ow), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
-        renderBlocksRows(m, (i + 1), n)
+        var row: Any = fsRow(i, off, false)
+        var rt: Any = addTextT(nm, (ROW_X() + 32.0), (rowYOf(i, off) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
+        var st: Any = addTextT(concat("归属 ", ow), (ROW_X() + 32.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
+        renderBlocksRows(m, (i + 1), n, off)
     }
 @impure
 fun policyPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
-    if (!rowInRowX(mx)) { return s } else null
     var n: Nat = policyCount(modEnt(m))
-    var ri: Nat = panelRowHit(my, n)
+    var off: Nat = engNum(s, F_SCROLL())
+    var ri: Nat = panelRowHit(my, n, off)
     return (if (ri < n) engPolicyAcquire(m, s, ri) else s)
 }
 
@@ -196,7 +208,7 @@ fun renderOpsMain(m: Json, s: Str): Null {
     fsFrame(opsMainTitle(ent, ci, s))
     renderOpsMainRows(m, s, 0, arrLen(ops))
     var rows: Nat = arrLen(ops)
-    var row: Any = fsRow(rows, false)
+    var row: Any = fsRow(rows, 0, false)
     var skip: Any = addTextT("结束操作（不操作，直接结算）", (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(rows)) + 26.0), 24.0, 400, COL_SKIP(), "panel", true, 32.0)
     null
 }
@@ -211,7 +223,7 @@ fun renderOpsMainRows(m: Json, s: Str, i: Nat, n: Nat): Null =
     else {
         var ent: Json = modEnt(m)
         var pg: Json = arrAt(chapterOps(ent, engNum(s, F_CHAP())), i)
-        var row: Any = fsRow(i, false)
+        var row: Any = fsRow(i, 0, false)
         var nm: Any = addTextT(jstr(pg, "name"), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
         var ds: Any = addTextT(jstr(pg, "desc"), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
         renderOpsMainRows(m, s, (i + 1), n)
@@ -227,7 +239,7 @@ fun renderOpsPage(m: Json, s: Str, pid: Nat): Null {
     var st1: Any = addTextT(opsStripText(m, s, pg), (ROW_X() + 4.0), STRIP_Y(), 24.0, 400, TXT_VAR(), "panel", true, 32.0)
     renderOpsPageRows(m, s, pid, pg, 0, arrLen(jk(pg, "options")))
     var rows: Nat = arrLen(jk(pg, "options"))
-    var row: Any = fsRow(rows, false)
+    var row: Any = fsRow(rows, 0, false)
     var back: Any = addTextT("返回操作页", (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(rows)) + 26.0), 24.0, 400, TXT_VAR(), "panel", true, 32.0)
     null
 }
@@ -252,7 +264,7 @@ fun renderOpsPageRows(m: Json, s: Str, pid: Nat, pg: Json, i: Nat, n: Nat): Null
         var opts: Json = jk(pg, "options")
         var sel: Bool = strHas(engField(s, F_SEL()), selToken(pid, i))
         var dot: Str = if (sel) "● " else "○ "
-        var row: Any = fsRow(i, sel)
+        var row: Any = fsRow(i, 0, sel)
         var nm: Any = addTextT(concat(dot, jstr(arrAt(opts, i), "name")), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 14.0), 28.0, 600, if (sel) ON_PRIMARY() else TXT_HEX(), "panel", true, 32.0)
         var ds: Any = addTextT(jstr(arrAt(opts, i), "desc"), (ROW_X() + 32.0), (ROW_Y0() + (ROW_DY() * toRat(i)) + 54.0), 20.0, 400, if (sel) ON_PRIMARY() else TXT_VAR(), "panel", true, 32.0)
         renderOpsPageRows(m, s, pid, pg, (i + 1), n)
@@ -266,13 +278,13 @@ fun opsPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
     if (!rowInRowX(mx)) { return s } else null
     if (strCmp(engField(s, F_PAGE()), "L") == 0) {
         var rows: Nat = arrLen(ops)
-        var ri: Nat = panelRowHit(my, (rows + 1))
+    var ri: Nat = panelRowHit(my, (rows + 1), 0)
         return (if (ri < rows) engOpenOpsPage(m, s, ri) else (if (ri == rows) engOpsSkip(m, s) else s))
     } else {
         var pid: Nat = natOr(parseNat(engField(s, F_PAGE())), 0)
         var opts: Json = jk(arrAt(ops, pid), "options")
         var rows2: Nat = arrLen(opts)
-        var ri2: Nat = panelRowHit(my, (rows2 + 1))
+    var ri2: Nat = panelRowHit(my, (rows2 + 1), 0)
         return (if (ri2 < rows2) engOpsExec(m, s, pid, ri2) else (if (ri2 == rows2) engOpsBack(m, s) else s))
     }
 }

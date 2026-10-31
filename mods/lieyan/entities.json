@@ -1,8 +1,7 @@
 {
   "countries": [
     {
-      "id": "country.cn",
-      "name": "中国"
+      "id":"country.cn","name":"中华人民共和国"
     }
   ],
   "factions": [

@@ -186,9 +186,9 @@ fun geomPtScan(pts: List[Str], i: Nat, acc: Str): Str =
     if (!listHas(pts, i)) acc
     else {
         var parts: List[Str] = strSplit(strOr(elementAt(pts, i), ""), " ")
-        var x: Nat = natOr(parseNat(strOr(elementAt(parts, 0), "0")), 0)
-        var y: Nat = natOr(parseNat(strOr(elementAt(parts, 1), "0")), 0)
-        var made: Str = concat(concat(toStr(x * 2), " "), toStr(y * 2))
+        var x: Rat = when (parseRat(strOr(elementAt(parts, 0), "0"))) { is Some(v) => v; None => 0.0 }
+        var y: Rat = when (parseRat(strOr(elementAt(parts, 1), "0"))) { is Some(v) => v; None => 0.0 }
+        var made: Str = concat(concat(toStr(x * 2.0), " "), toStr(y * 2.0))
         geomPtScan(pts, (i + 1), if (i == 0) made else concat(concat(acc, ","), made))
     }
 fun listHas(lst: List[Str], i: Nat): Bool = when (elementAt(lst, i)) { is Some(_) => true; None => false }
@@ -275,6 +275,15 @@ fun runSmoke(): Null {
     // 操作/国策/属性/地块界面由底栏按钮切全屏打开）
     st = engTickStart(m, st)
     onScroll { dy =>
+        var pn: Str = engField(st, F_PANEL())
+        if (strCmp(pn, "none") != 0) {
+            var ent: Json = modEnt(m)
+            var n: Nat = if (strCmp(pn, "policy") == 0) policyCount(ent) else (if (strCmp(pn, "attrs") == 0) resCount(ent) else arrLen(jk(ent, "blocks")))
+            var maxOff: Nat = if (n > ROWS_FIT()) (n - ROWS_FIT()) else 0
+            var cur: Nat = engNum(st, F_SCROLL())
+            var nxt: Nat = if (dy > 0.0) (if (cur < maxOff) (cur + 1) else cur) else (if (cur > 0) (cur - 1) else cur)
+            if (nxt != cur) { st = renderPanelRefresh(m, engSetNum(st, F_SCROLL(), nxt), pn) }
+        } else {
         var f: Rat = if (dy > 0.0) (1.0 / ZOOM_STEP()) else ZOOM_STEP()
         var gx: Rat = worldXOf(viewS, viewX, mousePosX())
         var gy: Rat = worldYOf(viewS, viewY, mousePosY())
@@ -286,6 +295,7 @@ fun runSmoke(): Null {
             viewY = panYOf(ns, viewY, 0.0)
             viewS = ns
             applyView(ns, viewX, viewY)
+        }
         }
     }
     onMouseDown("left") { _e => if (!pressed) {

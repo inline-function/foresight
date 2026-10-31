@@ -6,7 +6,7 @@ fun TOP_TITLE_X(): Rat = 32.0
 fun CHIP_X0(): Rat = 560.0
 fun CHIP_W(): Rat = 148.0
 fun CHIP_DY(): Rat = 160.0
-fun DATE_CX(): Rat = 1560.0
+fun DATE_CX(): Rat = 1780.0
 fun TBAR_HEX(): Str = "#1F2327"
 fun SUB_HEX(): Str = "#B7BFC8"
 fun RES_HEX(): Str = "#E4E7EA"
@@ -32,7 +32,6 @@ fun refreshTopbar(m: Json, s: Str): Null {
     var dt: Str = dateText(engNum(s, F_Y()), engNum(s, F_M()), engNum(s, F_D()))
     var tt: Str = if (strCmp(timeEra(md), "") == 0) dt else concat(concat(timeEra(md), " · "), dt)
     var t1: Any = addTextC(tt, DATE_CX(), 44.0, 24.0, SUB_HEX(), "ui-time", true, 12.0)
-    resChipLoop(m, s, 0, 3)
     null
 }
 

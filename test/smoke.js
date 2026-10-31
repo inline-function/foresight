@@ -168,6 +168,8 @@ function rowY(i) { return 160 + i * 112; }
 function navBtn(i) { clickAt(240 + i * 480, 1044); }
 function openPage(i) { clickAt(960, rowY(i)); }
 function pickOption(i) { clickAt(960, rowY(i)); }
+function scrollDown() { __sgScrollHandlers.forEach(function (f) { f({ y: 120.0 }); }); }
+function scrollUp() { __sgScrollHandlers.forEach(function (f) { f({ y: -120.0 }); }); }
 function anyPanel() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }); }
 function clearEvents(cap) {
     for (var i = 0; i < cap; i++) {
@@ -195,13 +197,12 @@ var camP = calls("camPos");
 ok("t89 相机：camPos=(999,515) 东亚地图初始视野", camP.length >= 1 && camP[camP.length - 1].x === 999.0,
     JSON.stringify(camP[camP.length - 1] || {}));
 // ---- t89 启动：MD3 顶栏/底栏 + 先看地图（面板不自动开，队长裁决） ----
-ok("t89 MD3 顶栏：国家/派系/日期 + 资源 chips（疫情 10 pill）",
-    objsWithText("中国").length > 0 && objsWithText("建制派").length > 0
-    && objsTextHas("烈焰升腾 · 2019 年 12 月 1 日").length > 0 && objsTextHas("疫情 10").length > 0,
+ok("t89 MD3 顶栏：国家/派系/日期（资源 chips 已移入国家属性）",
+    objsWithText("中华人民共和国").length > 0 && objsWithText("建制派").length > 0
+    && objsTextHas("烈焰升腾 · 2019 年 12 月 1 日").length > 0,
     oneText("2019 年"));
-ok("t89 MD3 chips：资源 pill 为原生圆角矩形",
-    __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-res") >= 0
-    && o.comps.some(function (c) { return c && c.comp === "rect" && c.radius > 0; }); }));
+ok("t89 MD3 顶栏无资源 chips（移入国家属性面板）",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("ui-res") >= 0; }).length === 0);
 ok("t89 MD3 底栏导航：4 项 操作/国策/国家属性/控制地块",
     ["操作", "国策", "国家属性", "控制地块"].every(function (t) { return objsWithText(t).length > 0; }));
 ok("t89 MD3 导航图标：过程化图标 rect 拼接（>=8 个 ui-nav rect）",
@@ -227,8 +228,8 @@ ok("t89 MD3 状态层：松开后覆盖色消失",
 // ---- t89 全屏界面（裁决 6.1）：操作 ----
 ok("t89 全屏界面：操作 标题=序章 · 2019年的冬天 + 行动点 1 / 1",
     objsTextHas("序章 · 2019年的冬天").length > 0 && objsTextHas("行动点 1 / 1").length > 0, oneText("序章"));
-ok("t89 全屏界面：覆盖整屏（1920x1008 panel 层，底栏导航保留可见）",
-    hasTagRect(1920.0, 1008.0, "panel")
+ok("t89 全屏界面：覆盖整屏（1920x1080 panel 层，底栏导航重绘于其上）",
+    hasTagRect(1920.0, 1080.0, "panel")
     && __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-nav") >= 0; }));
 ok("t89 MD3 圆角：面板/按钮为原生圆角矩形（radius>0）",
     __sgObjs.filter(function (o) { return !o.destroyed && (o.tags.indexOf("panel") >= 0 || o.tags.indexOf("ui") >= 0)
@@ -256,10 +257,20 @@ navBtn(2);
 ok("t89 全屏切换：国家属性界面（9 资源全列 + 产出/天；医疗资源受国策方舱医院 +20 影响）",
     objsTextHas("医疗资源").length > 0 && objsTextHas("产出 0/天").length > 0 && objsTextHas("产出 20/天").length > 0,
     JSON.stringify(__sgObjs.filter(function (o) { return !o.destroyed && o.text; }).map(function (o) { return o.text; }).slice(6, 14)));
+scrollDown(); snap();
+ok("t89 面板滚动：滚轮下移后第 8 行（科研资源）出现在可视区",
+    objsTextHas("政治点").length > 0, "scroll");
+scrollDown(); snap();
+ok("t89 面板滚动：再滚到底（第 9 行可见、首行滚出）",
+    objsTextHas("科技点").length > 0 && objsTextHas("疫情").length === 0, "scroll2");
+scrollUp(); scrollUp(); snap();
+ok("t89 面板滚动：连按两下回顶（首行疫情回到可视区、末行滚出）",
+    objsTextHas("疫情").length > 0 && objsTextHas("科技点").length === 0, "scroll3");
 navBtn(3);
-ok("t89 全屏切换：控制地块界面（武汉/北京/上海 + 归属 中国）",
+snap();
+ok("t89 全屏切换：控制地块界面（武汉/北京/上海 + 归属 中华人民共和国）",
     ["武汉", "北京", "上海"].every(function (t) { return objsWithText(t).length > 0; })
-    && objsTextHas("归属 中国").length > 0);
+    && objsTextHas("归属 中华人民共和国").length > 0);
 clickAt(152, 64);
 ok("t89 返回按钮：回到地图主界面（panel 层清空）", !anyPanel() && objsWithText("操作").length > 0);
 navBtn(0);
