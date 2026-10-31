@@ -1,7 +1,0 @@
-fun main(): Null {
-    print(concat("dec=", toStr(ratOr(parseRat("848.5"), 0.0))))
-    print(concat("neg=", toStr(ratOr(parseRat("-90"), 0.0))))
-    print(concat("negdec=", toStr(ratOr(parseRat("-90.25"), 0.0))))
-    print(concat("int=", toStr(ratOr(parseRat("42"), 0.0))))
-    null
-}

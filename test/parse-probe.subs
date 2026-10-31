@@ -1,6 +1,0 @@
-fun pr(s: Str): Rat = when (parseRat(s)) { is Some(v) => v; None => 0.0 }
-print(concat("dec=", toStr(pr("848.5"))))
-print(concat("neg=", toStr(pr("-90"))))
-print(concat("negdec=", toStr(pr("-90.25"))))
-print(concat("int=", toStr(pr("42"))))
-print(concat("bad=", toStr(pr("abc"))))
