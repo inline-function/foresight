@@ -248,8 +248,11 @@ fun runSmoke(): Null {
     var n: Nat = mapProvCount(geo)
     var geoBg: Any = mapLoad(tblX2(mapEastBg()))
     var nBg: Nat = mapProvCount(geoBg)
-    var bg: Any = addRectT(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_SEA(), "ui", 10.0)
-    objTag(bg, "ui")
+    var bg: Any = objAdd()
+    unchecked objUse(bg, compPos((TX0() - PAD()), (TY0() - PAD())))
+    unchecked objUse(bg, compRect(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0))))
+    unchecked objUse(bg, compColorHex(COL_SEA()))
+    unchecked objTag(bg, "ui")
     @mut var sel: Int = -1
     @mut var st: Str = engInit(md, ent)
     buildTopbar(m, st)
