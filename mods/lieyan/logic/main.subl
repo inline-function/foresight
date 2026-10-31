@@ -1,0 +1,8 @@
+// lieyan 模组逻辑占位（mods/<modid>/logic/*.subl 约定）
+//
+// 《烈焰升腾》正式模组：序章 + 第一章疫情时期 vertical slice。
+// 视图层全部由 entities.json 驱动（超事件/沉浸式/事件卡/操作页/资源/章末结算），
+// 本体（foresight）只是叙事引擎，不含任何剧情文案。
+// 本目录的 .subl 是模组附着逻辑：构建期仅扫描进模组清单的 logic 字段，
+// 执行链路待 t84（Kotlin subs 解释器内置为 Sublimation 标准库）交付后接通——
+// 届时用于：饭桌副线变体选择、防疫评价分数计算、章节间 flag 结转。

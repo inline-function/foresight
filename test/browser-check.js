@@ -75,14 +75,10 @@ async function main() {
     console.log('PROBE-' + tag + ' ' + res);
     return res;
   }
-  // 阶段2 玩家操作：经济页 -> 国家干预 -> 返回 -> 军政页 -> 扩充军备 -> 精兵整编（AP 0 -> 自动结算）
+  // lieyan 模组（活动模组）：序章操作页 -> 签署应急预案（AP 1->0 自动结算）-> 序章超事件
   await probe('ops-panel');
-  await click(300, 170);  // 经济操作页
-  await click(300, 205);  // 国家干预（radio 锁定）
-  await click(300, 262);  // 返回操作页
-  await click(300, 205);  // 军政操作页
-  await click(300, 170);  // 扩充军备
-  await click(300, 205);  // 精兵整编 -> 行动点 0 -> 自动结算 -> 超事件（全屏黑底 z=50）
+  await click(300, 170);  // 序章操作页「应急预案」
+  await click(300, 170);  // 签署《疫情防控应急预案》-> 行动点 0 -> 自动结算 -> 超事件（全屏黑底 z=50）
   var p2 = await probe('super-event');
   var blackOk = false;
   try {
@@ -90,11 +86,8 @@ async function main() {
     blackOk = (j2.center[0] + j2.center[1] + j2.center[2]) < 90 && (j2.bottombar[0] + j2.bottombar[1] + j2.bottombar[2]) < 90;
   } catch (e10) {}
   console.log('CHECK-SUPER-BLACK ' + (blackOk ? 'PASS 超事件全屏黑底覆盖（顶栏底栏被遮）' : 'FAIL 中心/底栏未黑 ' + p2));
-  // 超事件逐行 -> 下一项（事件卡/沉浸式）后截图
-  await click(480, 300);
-  await click(480, 300);
-  await click(480, 300);
-  await click(480, 300);
+  // 序章超事件逐行（12 行 -> 推进至第一章开场沉浸式「会议室」）后截图
+  for (var li = 0; li < 12; li++) await click(480, 300);
   var shot = null;
   try { var s = await send('Page.captureScreenshot', { format: 'png' }); if (s && s.data) { fs.writeFileSync(OUT_PNG, Buffer.from(s.data, 'base64')); shot = fs.statSync(OUT_PNG).size; } }
   catch (e9) {}

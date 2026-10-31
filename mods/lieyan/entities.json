@@ -1,0 +1,1533 @@
+{
+  "countries": [
+    {
+      "id": "country.cn",
+      "name": "中国"
+    }
+  ],
+  "factions": [
+    {
+      "id": "faction.establishment",
+      "name": "建制派",
+      "desc": "务实稳健，以经济发展为核心，相信制度内改革"
+    },
+    {
+      "id": "faction.national",
+      "name": "民族派",
+      "desc": "强调自主与强硬"
+    },
+    {
+      "id": "faction.reform",
+      "name": "改革派",
+      "desc": "推动深层变革"
+    },
+    {
+      "id": "faction.tech",
+      "name": "科技派",
+      "desc": "技术路线优先"
+    }
+  ],
+  "ui": {
+    "ops": "操作",
+    "policy": "国策",
+    "attrs": "国家属性",
+    "blocks": "控制地块",
+    "gameOver": "终局"
+  },
+  "resources": [
+    {
+      "id": "res.danger",
+      "name": "疫情",
+      "start": 10,
+      "max": 100,
+      "produce": 0
+    },
+    {
+      "id": "res.support",
+      "name": "民心",
+      "start": 68,
+      "max": 100,
+      "produce": 0
+    },
+    {
+      "id": "res.economy",
+      "name": "经济",
+      "start": 65,
+      "max": 100,
+      "produce": 0
+    },
+    {
+      "id": "res.medical",
+      "name": "医疗资源",
+      "start": 60,
+      "max": 100,
+      "produce": 0
+    },
+    {
+      "id": "res.finance",
+      "name": "国库",
+      "start": 1000,
+      "max": 2000,
+      "produce": 20
+    },
+    {
+      "id": "res.stability",
+      "name": "稳定",
+      "start": 72,
+      "max": 100,
+      "produce": 0
+    },
+    {
+      "id": "res.fatigue",
+      "name": "基层疲劳",
+      "start": 15,
+      "max": 100,
+      "produce": 2
+    },
+    {
+      "id": "res.politics",
+      "name": "政治点",
+      "start": 45,
+      "max": 999,
+      "produce": 1
+    },
+    {
+      "id": "res.tech",
+      "name": "科技点",
+      "start": 30,
+      "max": 999,
+      "produce": 1
+    }
+  ],
+  "policies": [
+    {
+      "id": "policy.fangcang",
+      "name": "方舱医院",
+      "requires": [],
+      "effects": [
+        {
+          "op": "res",
+          "v": "res.medical",
+          "n": 20
+        }
+      ]
+    },
+    {
+      "id": "policy.healthcode",
+      "name": "健康码体系",
+      "requires": [],
+      "effects": [
+        {
+          "op": "res",
+          "v": "res.stability",
+          "n": 2
+        },
+        {
+          "op": "res",
+          "v": "res.tech",
+          "n": 5
+        }
+      ]
+    },
+    {
+      "id": "policy.rework",
+      "name": "复工指导手册",
+      "requires": [
+        "policy.fangcang"
+      ],
+      "effects": [
+        {
+          "op": "res",
+          "v": "res.economy",
+          "n": 4
+        }
+      ]
+    }
+  ],
+  "chapters": [
+    {
+      "id": "ch.prologue",
+      "act": "序章",
+      "name": "2019年的冬天",
+      "ticks": 1,
+      "ap": 1,
+      "perTick": [],
+      "ops": [
+        {
+          "id": "op.plan",
+          "name": "应急预案",
+          "desc": "桌上的简报只有一页",
+          "status": [
+            "res.danger"
+          ],
+          "options": [
+            {
+              "id": "op.plan.sign",
+              "name": "签署《疫情防控应急预案》",
+              "desc": "你拿起笔，签了第一份文件",
+              "effects": [
+                {
+                  "op": "flagSet",
+                  "v": "signed_plan"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "end": {
+        "when": [],
+        "next": 1,
+        "lines": [
+          "你签完字，看向窗外。街上的人还在买年货。没人戴口罩。",
+          "（第一章 疫情时期）"
+        ]
+      }
+    },
+    {
+      "id": "ch.plague",
+      "act": "第一章",
+      "name": "疫情时期",
+      "ticks": 18,
+      "ap": 3,
+      "perTick": [
+        {
+          "op": "res",
+          "v": "res.danger",
+          "n": 8
+        },
+        {
+          "op": "res",
+          "v": "res.medical",
+          "n": -3
+        },
+        {
+          "op": "res",
+          "v": "res.finance",
+          "n": 20
+        },
+        {
+          "op": "res",
+          "v": "res.fatigue",
+          "n": 2
+        }
+      ],
+      "ops": [
+        {
+          "id": "op.lockdown",
+          "name": "封控力度",
+          "desc": "人与钱的第一个拉扯",
+          "status": [
+            "res.danger",
+            "res.support",
+            "res.economy"
+          ],
+          "options": [
+            {
+              "id": "op.lockdown.none",
+              "name": "不封控",
+              "desc": "疫情 +8 / 经济 +2",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": 8
+                },
+                {
+                  "op": "res",
+                  "v": "res.economy",
+                  "n": 2
+                },
+                {
+                  "op": "flagSet",
+                  "v": "lockdown_none"
+                }
+              ]
+            },
+            {
+              "id": "op.lockdown.precise",
+              "name": "精准防控",
+              "desc": "疫情 -2 / 医疗 +2",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": -2
+                },
+                {
+                  "op": "res",
+                  "v": "res.medical",
+                  "n": 2
+                },
+                {
+                  "op": "flagSet",
+                  "v": "lockdown_precise"
+                }
+              ]
+            },
+            {
+              "id": "op.lockdown.local",
+              "name": "局部封控",
+              "desc": "疫情 -6 / 经济 -2",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": -6
+                },
+                {
+                  "op": "res",
+                  "v": "res.economy",
+                  "n": -2
+                },
+                {
+                  "op": "flagSet",
+                  "v": "lockdown_local"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "lockdown_any"
+                }
+              ]
+            },
+            {
+              "id": "op.lockdown.full",
+              "name": "严格封控",
+              "desc": "疫情 -12 / 民心 -2 / 经济 -5 / 疲劳 +3",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": -12
+                },
+                {
+                  "op": "res",
+                  "v": "res.support",
+                  "n": -2
+                },
+                {
+                  "op": "res",
+                  "v": "res.economy",
+                  "n": -5
+                },
+                {
+                  "op": "res",
+                  "v": "res.fatigue",
+                  "n": 3
+                },
+                {
+                  "op": "flagSet",
+                  "v": "lockdown_strict"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "lockdown_any"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "op.stimulus",
+          "name": "经济刺激",
+          "desc": "钱从哪里来",
+          "status": [
+            "res.economy",
+            "res.finance"
+          ],
+          "options": [
+            {
+              "id": "op.stimulus.none",
+              "name": "不刺激",
+              "desc": "国库 +30 / 民心 -1",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.finance",
+                  "n": 30
+                },
+                {
+                  "op": "res",
+                  "v": "res.support",
+                  "n": -1
+                },
+                {
+                  "op": "flagSet",
+                  "v": "stimulus_none"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "stimulus_done"
+                }
+              ]
+            },
+            {
+              "id": "op.stimulus.targeted",
+              "name": "精准滴灌",
+              "desc": "经济 +6 / 国库 -25",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.economy",
+                  "n": 6
+                },
+                {
+                  "op": "res",
+                  "v": "res.finance",
+                  "n": -25
+                },
+                {
+                  "op": "flagSet",
+                  "v": "stimulus_targeted"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "stimulus_done"
+                }
+              ]
+            },
+            {
+              "id": "op.stimulus.mass",
+              "name": "大规模刺激",
+              "desc": "经济 +12 / 疫情 +2 / 国库 -60",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.economy",
+                  "n": 12
+                },
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": 2
+                },
+                {
+                  "op": "res",
+                  "v": "res.finance",
+                  "n": -60
+                },
+                {
+                  "op": "flagSet",
+                  "v": "stimulus_mass"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "stimulus_done"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "op.communication",
+          "name": "舆论引导",
+          "desc": "说什么、怎么说",
+          "status": [
+            "res.support",
+            "res.stability"
+          ],
+          "options": [
+            {
+              "id": "op.communication.public",
+              "name": "公开透明",
+              "desc": "民心 +7 / 疫情 -1",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.support",
+                  "n": 7
+                },
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": -1
+                },
+                {
+                  "op": "flagSet",
+                  "v": "communication_public"
+                }
+              ]
+            },
+            {
+              "id": "op.communication.downplay",
+              "name": "适度淡化",
+              "desc": "民心 +1 / 疫情 +1",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.danger",
+                  "n": 1
+                },
+                {
+                  "op": "res",
+                  "v": "res.support",
+                  "n": 1
+                },
+                {
+                  "op": "flagSet",
+                  "v": "communication_downplay"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "communication_any"
+                }
+              ]
+            },
+            {
+              "id": "op.communication.unified",
+              "name": "统一口径",
+              "desc": "民心 +3 / 稳定 +2",
+              "effects": [
+                {
+                  "op": "res",
+                  "v": "res.support",
+                  "n": 3
+                },
+                {
+                  "op": "res",
+                  "v": "res.stability",
+                  "n": 2
+                },
+                {
+                  "op": "flagSet",
+                  "v": "communication_unified"
+                },
+                {
+                  "op": "flagSet",
+                  "v": "communication_any"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "end": {
+        "when": [
+          {
+            "op": "resGte",
+            "v": "res.danger",
+            "n": 80
+          }
+        ],
+        "next": -1,
+        "dateJump": {
+          "y": 2020,
+          "m": 4,
+          "d": 8
+        },
+        "effects": [],
+        "lines": [
+          "2020 年，春。",
+          "（饭桌·疫情后）",
+          "父亲低头吃饭。母亲还没回来。爷爷没说话。",
+          "疫情过去了。但「账单」来了。",
+          "（第一章 完 · vertical slice。第二章「内战前夕」待交付）"
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "ev.prologue",
+      "kind": "super",
+      "once": true,
+      "title": "2019年的冬天",
+      "bgm": "bgm-prologue",
+      "when": [
+        {
+          "op": "tick",
+          "n": 1
+        }
+      ],
+      "lines": [
+        "一切还没有开始。一切已经在开始。",
+        "2019年12月。武汉报告「不明原因肺炎」。",
+        "没有人知道这是什么。没有人知道它会变成什么。",
+        "你坐在办公室里。桌上放着一份简报。简报只有一页。",
+        "第一页写着：「目前病例数：27。死亡率：未知。传播途径：未知。」",
+        "你翻到第二页。第二页是空的。",
+        "秘书说：「就这些。专家说『可能比非典严重』。」",
+        "你问：「有多严重？」",
+        "秘书说：「不知道。但专家说——如果我们现在不准备，以后就不用准备了。」",
+        "你看着那份空白的第二页。你签了第一份文件。",
+        "你对自己说：这次不一样。这次我们准备了。",
+        "你不知道，你「准备了」的东西，和「来了」的东西，不是同一种东西。"
+      ]
+    },
+    {
+      "id": "ev.meeting",
+      "kind": "imm",
+      "once": true,
+      "title": "会议室",
+      "bgm": "bgm-ch1-open",
+      "side": "卫生部长 vs 财政部长",
+      "when": [
+        {
+          "op": "tick",
+          "n": 1
+        }
+      ],
+      "bg": "",
+      "portrait": "",
+      "lines": [
+        "卫生部长：「封城。必须封。武汉一千多万人。封了怎么活？不封，可能全国都活不了。」",
+        "财政部长：「封城经济会崩。我们刚缓过来。再崩一次，撑不住。」",
+        "卫生部长：「经济崩了可以再建。人死了不能复生。」",
+        "财政部长：「你说得轻巧。经济崩了，死的人更多。」",
+        "你想起 2003 年。那时候你还在基层。每天数字在涨，没有人知道什么时候是个头。",
+        "你：「让我想想。」他们都在看你。等你做决定。"
+      ]
+    },
+    {
+      "id": "ev.father",
+      "kind": "card",
+      "once": true,
+      "title": "父亲的电话",
+      "priority": 20,
+      "when": [
+        {
+          "op": "flag",
+          "v": "stimulus_done"
+        }
+      ],
+      "content": "父亲在工厂上班。工厂因为疫情订单减少。老板说：「要么降薪，要么裁员。」父亲打电话给你：「领导，我不是来要钱的。我就是想问一句：我们这些工人，还算不算『人民』？」电话那头很吵——机器声、说话声、有人在喊「老板来了」。",
+      "options": [
+        {
+          "name": "保企业，不裁员",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.finance",
+              "n": -15
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": 10
+            },
+            {
+              "op": "flagSet",
+              "v": "factory_saved"
+            },
+            {
+              "op": "flagSet",
+              "v": "factory"
+            }
+          ]
+        },
+        {
+          "name": "让市场决定",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -15
+            },
+            {
+              "op": "res",
+              "v": "res.economy",
+              "n": 5
+            },
+            {
+              "op": "flagSet",
+              "v": "factory_market"
+            },
+            {
+              "op": "flagSet",
+              "v": "factory"
+            }
+          ]
+        },
+        {
+          "name": "（沉默）",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -10
+            },
+            {
+              "op": "flagSet",
+              "v": "factory"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.hospital",
+      "kind": "card",
+      "once": true,
+      "title": "母亲的医院",
+      "priority": 20,
+      "when": [
+        {
+          "op": "flag",
+          "v": "lockdown_any"
+        },
+        {
+          "op": "resLte",
+          "v": "res.medical",
+          "n": 49
+        }
+      ],
+      "content": "医院走廊。灯管闪烁。远处有咳嗽声。母亲打电话回家：「……我没事。你们别出门。家里还有菜吗？」孩子问：「妈妈你什么时候回来？」母亲：「快了。」孩子问：「『快了』是『什么时候』？」母亲沉默了一会儿：「等『病人少了』就回来。」她说「快了」的时候，声音在抖。孩子听不出来。但你听出来了。",
+      "options": [
+        {
+          "name": "给医护人员发补贴/轮休",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.finance",
+              "n": -15
+            },
+            {
+              "op": "res",
+              "v": "res.medical",
+              "n": 5
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": 5
+            },
+            {
+              "op": "flagSet",
+              "v": "medical_support"
+            }
+          ]
+        },
+        {
+          "name": "号召「坚持」",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.medical",
+              "n": -5
+            },
+            {
+              "op": "res",
+              "v": "res.fatigue",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "name": "（沉默）",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.medical",
+              "n": -10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.oldli",
+      "kind": "card",
+      "once": true,
+      "title": "老李走了",
+      "priority": 20,
+      "when": [
+        {
+          "op": "flag",
+          "v": "communication_any"
+        },
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 41
+        }
+      ],
+      "content": "爷爷每天看新闻。他不戴口罩，说「我活了七十多年，什么没见过」。后来爷爷开始戴口罩了。因为邻居老李去世了。爷爷说：「老李走了。」孩子问：「老李是谁？」老李不是死于新冠。老李死于「不敢去医院」。他拖了三天。三天后，他走了。",
+      "options": [
+        {
+          "name": "公开「不敢去医院」的问题",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": 10
+            },
+            {
+              "op": "res",
+              "v": "res.medical",
+              "n": -20
+            },
+            {
+              "op": "flagSet",
+              "v": "neighbor_death"
+            }
+          ]
+        },
+        {
+          "name": "不公开，内部处理",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -5
+            },
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": 5
+            },
+            {
+              "op": "flagSet",
+              "v": "neighbor_death"
+            }
+          ]
+        },
+        {
+          "name": "（沉默）",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -10
+            },
+            {
+              "op": "flagSet",
+              "v": "neighbor_death"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.essay",
+      "kind": "card",
+      "once": true,
+      "title": "孩子的作文",
+      "priority": 20,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 17
+        }
+      ],
+      "content": "孩子在学校写了一篇作文。题目是「我的愿望」。你听说这件事，是从孩子母亲的一通电话里。她还提到了别的——关于工厂、关于订单、关于明年。",
+      "options": [
+        {
+          "name": "把作文收好（留位·第二章转产后交付）",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": 3
+            },
+            {
+              "op": "flagSet",
+              "v": "child_essay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner1",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 4
+        }
+      ],
+      "content": "一家四口坐在饭桌前吃饭。电视里在播「疫情」的新闻。父亲说：「应该没事吧。」母亲说：「不知道。医院里在准备。」孩子说：「我们学校停课了。」爷爷说：「停课？我们那时候停课是因为打仗。」他们吃饭。他们说话。他们不知道，打仗才刚刚开始。",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner2_lockdown",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 8
+        },
+        {
+          "op": "flag",
+          "v": "lockdown_any"
+        }
+      ],
+      "content": "电视里还在播疫情。父亲不用去工厂了——工厂停了。母亲出门更早了。孩子在家里上网课，爷爷教他折纸飞机。",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner2_open",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 8
+        },
+        {
+          "op": "flagNot",
+          "v": "lockdown_any"
+        }
+      ],
+      "content": "电视里还在播疫情。父亲每天还是去工厂。母亲每天还是去医院。孩子问：「什么时候能不带口罩？」没有人回答。",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner3_stimulus",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 12
+        },
+        {
+          "op": "flag",
+          "v": "stimulus_done"
+        }
+      ],
+      "content": "饭桌上父亲难得有笑脸：「厂里接了政府的单子。说是『共渡难关』。」母亲没说话。她刚下班，眼睛是红的。",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner3_noop",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 12
+        },
+        {
+          "op": "flagNot",
+          "v": "stimulus_done"
+        }
+      ],
+      "content": "饭桌上没有声音。父亲说：「订单越来越少了。」母亲说：「医院越来越忙了。」孩子说：「我什么时候能开学？」",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner4_oldli",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 16
+        },
+        {
+          "op": "flag",
+          "v": "neighbor_death"
+        }
+      ],
+      "content": "爷爷说：「老李走了。」孩子问：「老李是谁？」爷爷说：「你不认识。你以后也不会认识了。」父亲低头吃饭。母亲还没回来。",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.dinner4_base",
+      "kind": "card",
+      "once": true,
+      "title": "饭桌",
+      "priority": 5,
+      "when": [
+        {
+          "op": "tick",
+          "n": 16
+        },
+        {
+          "op": "flagNot",
+          "v": "neighbor_death"
+        }
+      ],
+      "content": "爷爷说：「我活了七十多年，什么没见过。」父亲说：「现在也是打仗。打病毒。」爷爷说：「病毒？病毒算什么打仗。」",
+      "options": [
+        {
+          "name": "继续吃饭",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "ev.shaken_danger",
+      "kind": "card",
+      "once": true,
+      "title": "会议室里的沉默",
+      "priority": 15,
+      "when": [
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 61
+        }
+      ],
+      "content": "你召开会议。卫生部长说：「疫情还在涨。」财政部长说：「钱不够了。」交通部长说：「路封了，运不进来。」军方代表说：「军队可以介入。但您确定？」你问：「我们做错了什么？」没有人回答。你只知道，你「做了」很多事。但「做」了不等于「对」了。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.politics",
+              "n": -2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.shaken_support",
+      "kind": "card",
+      "once": true,
+      "title": "会议室里的沉默",
+      "priority": 15,
+      "when": [
+        {
+          "op": "resLte",
+          "v": "res.support",
+          "n": 49
+        }
+      ],
+      "content": "民调放在桌上。数字很难看。宣传部长说：「再不回应，来不及了。」你看着窗外。你能感觉到，有什么东西正在溜走——不是权力，是信任。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.politics",
+              "n": -2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.collapse",
+      "kind": "super",
+      "once": true,
+      "title": "失控",
+      "bgm": "bgm-end-collapse",
+      "priority": 30,
+      "when": [
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 80
+        }
+      ],
+      "lines": [
+        "医院走廊。救护车声。",
+        "你赢了时间，没赢病毒。",
+        "数据已经没有意义了。每一个数字后面都是一个人，每一个数字都在挤兑另一条命。",
+        "（评分：崩溃 · 提前收束，大 debuff 转入第二章）"
+      ]
+    },
+    {
+      "id": "ev.collapse_apply",
+      "kind": "card",
+      "once": true,
+      "title": "失控·结算",
+      "priority": 26,
+      "when": [
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 80
+        }
+      ],
+      "content": "失控结算：稳定 -25、民心 -20、经济 -15、国库 -150、基层疲劳 +15。pandemic_rating=collapse，提前收束进第二章（队长裁决：非结局）。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating"
+            },
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating_collapse"
+            },
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": -25
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -20
+            },
+            {
+              "op": "res",
+              "v": "res.economy",
+              "n": -15
+            },
+            {
+              "op": "res",
+              "v": "res.finance",
+              "n": -150
+            },
+            {
+              "op": "res",
+              "v": "res.fatigue",
+              "n": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.rating_excellent",
+      "kind": "super",
+      "once": true,
+      "title": "疫情结束",
+      "bgm": "bgm-end-excellent",
+      "priority": 30,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 29
+        },
+        {
+          "op": "resGte",
+          "v": "res.support",
+          "n": 71
+        }
+      ],
+      "lines": [
+        "2020 年，春。",
+        "疫情结束了。街上恢复了热闹。有人在放鞭炮——不是庆祝胜利，是庆祝「解封」。",
+        "秘书说：「疫情数据出来了。比预期好。」",
+        "但账单来了：财政赤字、民心损耗、基层疲劳。这些账单，要还。",
+        "疫情过去了。但过去的东西，好像没有完全回来。",
+        "（防疫评价：优秀——阶段 2 初始资源 +20%）"
+      ]
+    },
+    {
+      "id": "ev.rating_apply_excellent",
+      "kind": "card",
+      "once": true,
+      "title": "防疫评价·结算",
+      "priority": 26,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 29
+        },
+        {
+          "op": "resGte",
+          "v": "res.support",
+          "n": 71
+        }
+      ],
+      "content": "优秀结算：民心 +8、稳定 +3、政治点 +5（阶段 2 初始资源 +20% 的等效修正）。pandemic_rating=excellent。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating"
+            },
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating_excellent"
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": 8
+            },
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": 3
+            },
+            {
+              "op": "res",
+              "v": "res.politics",
+              "n": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.rating_pass",
+      "kind": "super",
+      "once": true,
+      "title": "疫情结束",
+      "bgm": "bgm-end-pass",
+      "priority": 30,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 59
+        },
+        {
+          "op": "resGte",
+          "v": "res.support",
+          "n": 40
+        },
+        {
+          "op": "resLte",
+          "v": "res.support",
+          "n": 70
+        }
+      ],
+      "lines": [
+        "2020 年，春。",
+        "疫情结束了。街上恢复了热闹，但有些店没有再开。",
+        "秘书说：「数据出来了。不好不坏。」",
+        "你点点头。你知道「不好不坏」在这场仗里，已经算赢。",
+        "（防疫评价：合格——正常进入第二章）"
+      ]
+    },
+    {
+      "id": "ev.rating_apply_pass",
+      "kind": "card",
+      "once": true,
+      "title": "防疫评价·结算",
+      "priority": 26,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 59
+        },
+        {
+          "op": "resGte",
+          "v": "res.support",
+          "n": 40
+        },
+        {
+          "op": "resLte",
+          "v": "res.support",
+          "n": 70
+        }
+      ],
+      "content": "合格结算：民心 +2。pandemic_rating=pass，正常进入第二章。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating"
+            },
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating_pass"
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.rating_fail_a",
+      "kind": "super",
+      "once": true,
+      "title": "疫情结束",
+      "bgm": "bgm-end-fail",
+      "priority": 30,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 60
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 79
+        }
+      ],
+      "lines": [
+        "2020 年，春。",
+        "疫情「结束」了。你不确定该用哪个词——是「结束」，还是「终于停了」。",
+        "数字停在高位很久才下来。下来的方式，不是你想要的。",
+        "你的文件还压在桌上。签过的、没签过的，都在。",
+        "（防疫评价：失败——阶段 2 初始稳定 -20、民心 -15）"
+      ]
+    },
+    {
+      "id": "ev.rating_apply_fail",
+      "kind": "card",
+      "once": true,
+      "title": "防疫评价·结算",
+      "priority": 26,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 60
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 79
+        }
+      ],
+      "content": "失败结算：稳定 -20、民心 -15。pandemic_rating=fail。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating"
+            },
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating_fail"
+            },
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": -20
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.rating_fail_b",
+      "kind": "super",
+      "once": true,
+      "title": "疫情结束",
+      "bgm": "bgm-end-fail",
+      "priority": 30,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resLte",
+          "v": "res.support",
+          "n": 39
+        }
+      ],
+      "lines": [
+        "2020 年，春。",
+        "疫情「结束」了。街上安静得不像庆祝。",
+        "人心散了。你知道它不是被病毒打散的。",
+        "（防疫评价：失败——阶段 2 初始稳定 -20、民心 -15）"
+      ]
+    },
+    {
+      "id": "ev.rating_apply_fail_b",
+      "kind": "card",
+      "once": true,
+      "title": "防疫评价·结算",
+      "priority": 26,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resLte",
+          "v": "res.support",
+          "n": 39
+        }
+      ],
+      "content": "失败结算（民心崩盘）：稳定 -20、民心 -15。pandemic_rating=fail。",
+      "options": [
+        {
+          "name": "继续",
+          "effects": [
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating"
+            },
+            {
+              "op": "flagSet",
+              "v": "pandemic_rating_fail"
+            },
+            {
+              "op": "res",
+              "v": "res.stability",
+              "n": -20
+            },
+            {
+              "op": "res",
+              "v": "res.support",
+              "n": -15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.crisis_fail",
+      "kind": "card",
+      "once": true,
+      "title": "信任危机",
+      "priority": 25,
+      "when": [
+        {
+          "op": "tickGte",
+          "n": 19
+        },
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 60
+        },
+        {
+          "op": "resLte",
+          "v": "res.danger",
+          "n": 79
+        }
+      ],
+      "content": "新闻：「多地爆发『问责』示威。示威者说：『防疫失败，谁负责？』」你看着新闻。你想起你签的每一份文件。你想起你「淡化」的每一句话。你「负责」了。但「负责」的「方式」，是「下台」。建制派影响力 -10、民族派 +5（「我们早就说过」）。",
+      "options": [
+        {
+          "name": "确认",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.politics",
+              "n": -10
+            },
+            {
+              "op": "flagSet",
+              "v": "trust_crisis"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev.crisis_collapse",
+      "kind": "card",
+      "once": true,
+      "title": "信任危机",
+      "priority": 25,
+      "when": [
+        {
+          "op": "resGte",
+          "v": "res.danger",
+          "n": 80
+        }
+      ],
+      "content": "新闻：「多地爆发『问责』示威。防疫系统濒临停摆。」你看着新闻。建制派影响力 -10、民族派 +5。失控的账单，不只是病毒的。",
+      "options": [
+        {
+          "name": "确认",
+          "effects": [
+            {
+              "op": "res",
+              "v": "res.politics",
+              "n": -10
+            },
+            {
+              "op": "flagSet",
+              "v": "trust_crisis"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "block.wuhan",
+      "name": "武汉",
+      "owner": "country.cn"
+    },
+    {
+      "id": "block.beijing",
+      "name": "北京",
+      "owner": "country.cn"
+    },
+    {
+      "id": "block.shanghai",
+      "name": "上海",
+      "owner": "country.cn"
+    }
+  ]
+}

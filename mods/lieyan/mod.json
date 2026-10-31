@@ -1,0 +1,17 @@
+{
+  "id": "lieyan",
+  "name": "烈焰升腾",
+  "version": "0.1",
+  "deps": [],
+  "player": {
+    "country": "中国",
+    "faction": "faction.establishment"
+  },
+  "time": {
+    "era": "烈焰升腾",
+    "startYear": 2019,
+    "startMonth": 12,
+    "startDay": 1,
+    "daysPerTick": 1
+  }
+}
