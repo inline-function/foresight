@@ -436,6 +436,85 @@ function mapHitProv(m, x, y) {
 }
 
 // ============================================================================
+// 叙事引擎扩展（t86）：模组存档（localStorage，回落内存）+ BGM 接入点。
+// 供模组逻辑 subs（t84 解释器）经 globalThis.__subl.call(op, args) 调用。
+// 注意：@game 白名单（game.subs 处理器）暂未收录这些 op——app/*.subl 不得
+// 直接声明调用（编译期会被处理器拒绝）；subs 打通后由解释器侧统一接入。
+// ============================================================================
+var __sgSavesMem = {};
+function saveLoad(name, value) {
+    var s = JSON.stringify(value);
+    try {
+        if (typeof localStorage !== "undefined" && localStorage) {
+            localStorage.setItem("__sg_save_" + name, s);
+            return true;
+        }
+    } catch (e) { /* 隐私模式/被禁：回落内存 */ }
+    __sgSavesMem[name] = s;
+    return true;
+}
+function saveGet(name) {
+    var raw = undefined;
+    try {
+        if (typeof localStorage !== "undefined" && localStorage) raw = localStorage.getItem("__sg_save_" + name);
+    } catch (e) { raw = undefined; }
+    if (raw === undefined || raw === null) {
+        raw = __sgSavesMem[name];
+        if (raw === undefined) return null;
+    }
+    try { return JSON.parse(raw); } catch (e2) { return null; }
+}
+function saveKeys() {
+    var out = [];
+    try {
+        if (typeof localStorage !== "undefined" && localStorage) {
+            for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf("__sg_save_") === 0) out.push(k.slice("__sg_save_".length));
+            }
+            return out;
+        }
+    } catch (e) {}
+    return Object.keys(__sgSavesMem);
+}
+function saveDrop(name) {
+    try {
+        if (typeof localStorage !== "undefined" && localStorage) localStorage.removeItem("__sg_save_" + name);
+    } catch (e) {}
+    delete __sgSavesMem[name];
+    return true;
+}
+// 音乐接入点：BGM 挂载/播放/停止。资产缺失（空名）或环境无 Audio 时**静默**——
+// 绝不因缺音乐打断叙事流（架构决策：资产缺失静默不报错）。
+var __sgBgmEl = null;
+var __sgBgmName = "";
+function bgmMount(name) {
+    __sgBgmEl = null;
+    __sgBgmName = "";
+    if (!name) return false;
+    try {
+        if (typeof Audio === "undefined" || !Audio) return false;
+        __sgBgmEl = new Audio(name);
+        __sgBgmEl.loop = true;
+        __sgBgmName = name;
+        return true;
+    } catch (e) { __sgBgmEl = null; __sgBgmName = ""; return false; }
+}
+function bgmPlay(name) {
+    if (!name) return false;
+    if (!__sgBgmEl || __sgBgmName !== name) { if (!bgmMount(name)) return false; }
+    try {
+        var pr = __sgBgmEl.play();
+        if (pr && pr.catch) pr.catch(function () {});
+        return true;
+    } catch (e) { return false; }
+}
+function bgmStop() {
+    if (__sgBgmEl) { try { __sgBgmEl.pause(); } catch (e) {} }
+    return true;
+}
+
+// ============================================================================
 // 宿主桥单入口（t38 定案 ABI）：globalThis.__subl.call(op, args)
 // ============================================================================
 // 注册表 __SG_OPS 是宿主桥的单一真源：op 名 → 上方具名实现。
@@ -474,6 +553,9 @@ var __SG_OPS = {
     onScroll: onScroll, camPos: camPos, camScale: camScale, compFixed: compFixed,
     onTouchStart: onTouchStart, onTouchMove: onTouchMove, onTouchEnd: onTouchEnd,
     touchCount: touchCount, touchX: touchX, touchY: touchY, compZ: compZ,
+    // 叙事引擎扩展（t86；供 subs 经 __subl.call 调用，不在 @game 白名单内）
+    saveLoad: saveLoad, saveGet: saveGet, saveKeys: saveKeys, saveDrop: saveDrop,
+    bgmMount: bgmMount, bgmPlay: bgmPlay, bgmStop: bgmStop,
 };
 
 // 安装 __subl.call（不覆盖宿主/产物可能已有的 __subl.main 等字段）
