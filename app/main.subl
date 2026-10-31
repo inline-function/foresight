@@ -6,12 +6,12 @@ fun VIEW_H(): Rat = 1080.0
 fun LABEL_Y(): Rat = 972.0
 
 // 地图世界范围（x2）
-fun TX0(): Rat = 280.0
-fun TX1(): Rat = 1400.0
-fun TY0(): Rat = 180.0
-fun TY1(): Rat = 1040.0
-fun INIT_X(): Rat = ((TX0() + TX1()) / 2.0)
-fun INIT_Y(): Rat = ((TY0() + TY1()) / 2.0)
+fun TX0(): Rat = (E_TX0() * 2.0)
+fun TX1(): Rat = (E_TX1() * 2.0)
+fun TY0(): Rat = (E_TY0() * 2.0)
+fun TY1(): Rat = (E_TY1() * 2.0)
+fun INIT_X(): Rat = (E_INIT_X() * 2.0)
+fun INIT_Y(): Rat = (E_INIT_Y() * 2.0)
 
 // MD3 深色 tonal 色板（Surface/Primary/OnSurface/Outline 各级）
 fun COL_BG(): Str = "#0F1113"
@@ -24,12 +24,49 @@ fun FILL_SEL(): Str = "#A6C8FF"
 fun CTR_X(): Rat = 960.0
 fun CTR_Y(): Rat = 540.0
 fun ZOOM_MIN(): Rat = 1.0
-fun ZOOM_MAX(): Rat = 4.0
+fun ZOOM_MAX(): Rat = 8.0
 fun ZOOM_STEP(): Rat = 1.15
 fun PAD(): Rat = 16.0
 fun DRAG_THRESHOLD(): Rat = 16.0
 fun blockHex(i: Nat): Str =
     if ((i % 2) == 0) "#31506B" else "#3A4656"
+// 省下标 -> 国家色（表按国家分段；E_* 段界来自 east-data.subl）
+fun provHex(i: Nat): Str =
+    if (i < E1()) C_CHN()
+    else (if (i < E2()) C_JPN()
+    else (if (i < E3()) C_KOR()
+    else (if (i < E4()) C_PRK()
+    else (if (i < E5()) C_MNG()
+    else (if (i < E6()) C_VNM()
+    else (if (i < E7()) C_LAO()
+    else (if (i < E8()) C_KHM()
+    else (if (i < E9()) C_THA()
+    else (if (i < E10()) C_MMR()
+    else (if (i < E11()) C_MYS()
+    else C_SGP()))))))))))
+// 背景板分段色：俄/印/哈/吉/塔/阿/巴（整国抽稀，不参与命中）
+fun bgHex(i: Nat): Str =
+    if (i < E_RUS()) C_RUS()
+    else (if (i < E_IND()) C_IND()
+    else (if (i < E_KAZ()) C_KAZ()
+    else (if (i < E_KGZ()) C_KGZ()
+    else (if (i < E_TJK()) C_TJK()
+    else (if (i < E_AFG()) C_AFG()
+    else C_PAK())))))
+// 表整体 x2：把 name:geom|... 的几何部分放大（名称保留）
+@impure
+fun tblX2Loop(rows: List[Str], i: Nat, acc: Str): Str =
+    if (!listHas(rows, i)) acc
+    else {
+        var row: Str = strOr(elementAt(rows, i), "")
+        var parts: List[Str] = strSplit(row, ":")
+        var nm: Str = strOr(elementAt(parts, 0), "")
+        var geo: Str = strOr(elementAt(parts, 1), "")
+        var made: Str = concat(concat(nm, ":"), geomScale(geo))
+        tblX2Loop(rows, (i + 1), if (strCmp(acc, "") == 0) made else concat(concat(acc, "|"), made))
+    }
+@impure
+fun tblX2(tbl: Str): Str = tblX2Loop(strSplit(tbl, "|"), 0, "")
 
 fun visW(viewS: Rat): Rat = (VIEW_W() / viewS)
 fun visH(viewS: Rat): Rat = (VIEW_H() / viewS)
@@ -40,6 +77,7 @@ fun panMaxY(viewS: Rat): Rat = ((TY1() + PAD()) - (visH(viewS) / 2.0))
 fun clampS(v: Rat, lo: Rat, hi: Rat): Rat = if (v < lo) lo else (if (v > hi) hi else v)
 fun clampP(v: Rat, lo: Rat, hi: Rat): Rat = if (lo > hi) ((lo + hi) / 2.0) else (if (v < lo) lo else (if (v > hi) hi else v))
 fun distAbs(a: Rat, b: Rat): Rat = if (a > b) (a - b) else (b - a)
+fun rectCap(w: Rat, h: Rat, r: Rat): Rat = if (w < h) (if (r > (w / 2.0)) (w / 2.0) else r) else (if (r > (h / 2.0)) (h / 2.0) else r)
 fun screenXOf(viewS: Rat, viewX: Rat, w: Rat): Rat = (((w - viewX) * viewS) + CTR_X())
 fun screenYOf(viewS: Rat, viewY: Rat, w: Rat): Rat = (((w - viewY) * viewS) + CTR_Y())
 fun worldXOf(viewS: Rat, viewX: Rat, s: Rat): Rat = (((s - CTR_X()) / viewS) + viewX)
@@ -63,22 +101,16 @@ fun addRectT(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat): Any {
 }
 // MD3 圆角：rect + 四角 circle 同色拼接（compCircle 为实心圆；r<=0 退化为直角）
 @impure
+@impure
 fun addRoundRect(w: Rat, h: Rat, x: Rat, y: Rat, hex: Str, tag: Str, z: Rat, r: Rat): Any {
-    var bw: Rat = (w - (r * 2.0))
-    var bh: Rat = (h - (r * 2.0))
+    var rr: Rat = rectCap(w, h, r)
     unchecked var o = objAdd()
-    unchecked objUse(o, compPos(x, (y + r)))
-    unchecked objUse(o, compRect(bw, bh))
+    unchecked objUse(o, compPos(x, y))
+    unchecked objUse(o, compRectR(w, h, rr))
     unchecked objUse(o, compColorHex(hex))
     unchecked objUse(o, compFixed())
     unchecked objUse(o, compZ(z))
     unchecked objTag(o, tag)
-    if ((r > 0.0) && (bw > 0.0) && (bh > 0.0)) {
-        addCircleT(r, (x + r), (y + r), hex, tag, z)
-        addCircleT(r, (x + w - r), (y + r), hex, tag, z)
-        addCircleT(r, (x + r), (y + h - r), hex, tag, z)
-        addCircleT(r, (x + w - r), (y + h - r), hex, tag, z)
-    } else null
     return o
 }
 @impure
@@ -166,13 +198,23 @@ fun listHas(lst: List[Str], i: Nat): Bool = when (elementAt(lst, i)) { is Some(_
 fun renderBlocksLoop(geo: Any, n: Nat, i: Nat, sel: Int): Null =
     if (i >= n) null
     else {
-        var hex: Str = if (i == sel) FILL_SEL() else blockHex(i)
+        var hex: Str = if (i == sel) FILL_SEL() else provHex(i)
         var o: Any = mapProvObj(geo, i, hex)
         objTag(o, "block")
         renderBlocksLoop(geo, n, (i + 1), sel)
     }
 @impure
 fun renderBlocks(geo: Any, n: Nat, sel: Int): Null = renderBlocksLoop(geo, n, 0, sel)
+@impure
+fun renderBgLoop(geo: Any, n: Nat, i: Nat): Null =
+    if (i >= n) null
+    else {
+        var o: Any = mapProvObj(geo, i, bgHex(i))
+        objTag(o, "provbg")
+        renderBgLoop(geo, n, (i + 1))
+    }
+@impure
+fun renderBg(geo: Any, n: Nat): Null = renderBgLoop(geo, n, 0)
 
 @impure
 fun applyView(viewS: Rat, viewX: Rat, viewY: Rat): Null {
@@ -202,8 +244,10 @@ fun runSmoke(): Null {
     var m: Json = activeMod()
     var md: Json = modMod(m)
     var ent: Json = modEnt(m)
-    var geo: Any = mapLoad(mapTableOf(ent))
+    var geo: Any = mapLoad(tblX2(mapEastFg()))
     var n: Nat = mapProvCount(geo)
+    var geoBg: Any = mapLoad(tblX2(mapEastBg()))
+    var nBg: Nat = mapProvCount(geoBg)
     var bg: Any = addRectT(((TX1() - TX0()) + (PAD() * 2.0)), ((TY1() - TY0()) + (PAD() * 2.0)), (TX0() - PAD()), (TY0() - PAD()), COL_SEA(), "ui", 10.0)
     objTag(bg, "ui")
     @mut var sel: Int = -1
@@ -211,6 +255,8 @@ fun runSmoke(): Null {
     buildTopbar(m, st)
     var label: Any = addTextC("", 960.0, LABEL_Y(), 26.0, COL_SUB(), "ui", true, 22.0)
     buildBottombar(m)
+    renderBg(geoBg, nBg)
+    renderBlocks(geo, n, -1)
     @mut var viewS: Rat = 1.0
     @mut var viewX: Rat = INIT_X()
     @mut var viewY: Rat = INIT_Y()

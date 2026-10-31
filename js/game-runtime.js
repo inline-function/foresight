@@ -112,6 +112,8 @@ function compSprite(name) { return __sgK().sprite(name); }
 function compPos(x, y) { return __sgK().pos(x, y); }
 function compScale(s) { return __sgK().scale(s); }
 function compRect(w, h) { return __sgK().rect(w, h); }
+    // 圆角矩形：KAPLAY rect 原生 radius（drawRect 走圆弧多边形，无拼缝）。
+    function compRectR(w, h, r) { return __sgK().rect(w, h, { radius: r }); }
 function compCircle(r) { return __sgK().circle(r); }
 // 统一字体 Maple Mono Normal CN；KAPLAY text 只认字体名（无 weight 通道），每字重独立 family。
 // 文本组件：统一字体 Maple Mono Normal CN（KAPLAY text 只认字体名字符串、无 weight 通道，
@@ -528,7 +530,7 @@ var __SG_OPS = {
     // 资源（sprite.subl）
     spriteLoad: spriteLoad,
     // 组件（comp*.subl）
-    compSprite: compSprite, compPos: compPos, compScale: compScale, compRect: compRect,
+    compSprite: compSprite, compPos: compPos, compScale: compScale, compRect: compRect, compRectR: compRectR,
     compCircle: compCircle, compText: compText, compColorHex: compColorHex, compArea: compArea,
     compBody: compBody, compSolid: compSolid, compTag: compTag, compAnchor: compAnchor,
     // 对象（obj*.subl）

@@ -60,7 +60,7 @@ globalThis.kaplay = function (opts) {
         sprite: function (n) { return { comp: "sprite", name: n }; },
         pos: function (x, y) { return { comp: "pos", x: x, y: y }; },
         scale: function (s) { return { comp: "scale", s: s }; },
-        rect: function (w, h) { return { comp: "rect", w: w, h: h }; },
+        rect: function (w, h, o) { return { comp: "rect", w: w, h: h, radius: (o && o.radius) || 0 }; },
         circle: function (r) { return { comp: "circle", r: r }; },
         text: function (t, o) { return { comp: "text", t: t, size: o && o.size }; },
         color: function (r, g, b) { return { comp: "color", r: r, g: g, b: b }; },
@@ -192,17 +192,16 @@ ok("t89 清晰度：texFilter=linear（字体线性过滤，文字锐利；像�
 var camS = calls("camScale");
 ok("t89 相机：camScale 已接线", camS.length >= 1, JSON.stringify(camS[0] || {}));
 var camP = calls("camPos");
-ok("t89 相机：camPos=(840,610) 地图初始视野（x2）", camP.length >= 1 && camP[camP.length - 1].x === 840.0,
+ok("t89 相机：camPos=(999,515) 东亚地图初始视野", camP.length >= 1 && camP[camP.length - 1].x === 999.0,
     JSON.stringify(camP[camP.length - 1] || {}));
-
 // ---- t89 启动：MD3 顶栏/底栏 + 先看地图（面板不自动开，队长裁决） ----
 ok("t89 MD3 顶栏：国家/派系/日期 + 资源 chips（疫情 10 pill）",
     objsWithText("中国").length > 0 && objsWithText("建制派").length > 0
     && objsTextHas("烈焰升腾 · 2019 年 12 月 1 日").length > 0 && objsTextHas("疫情 10").length > 0,
     oneText("2019 年"));
-ok("t89 MD3 chips：资源 pill 为圆角（ui-res 层含 circle 拼角）",
+ok("t89 MD3 chips：资源 pill 为原生圆角矩形",
     __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-res") >= 0
-        && o.comps.some(function (c) { return c && c.comp === "circle"; }); }));
+    && o.comps.some(function (c) { return c && c.comp === "rect" && c.radius > 0; }); }));
 ok("t89 MD3 底栏导航：4 项 操作/国策/国家属性/控制地块",
     ["操作", "国策", "国家属性", "控制地块"].every(function (t) { return objsWithText(t).length > 0; }));
 ok("t89 MD3 导航图标：过程化图标 rect 拼接（>=8 个 ui-nav rect）",
@@ -210,11 +209,10 @@ ok("t89 MD3 导航图标：过程化图标 rect 拼接（>=8 个 ui-nav rect）"
         && o.comps.some(function (c) { return c && c.comp === "rect"; }); }).length >= 8);
 ok("t89 启动：操作面板不自动开（先看地图，点底栏「操作」开全屏界面）",
     objsTextHas("行动点").length === 0);
-ok("t89 地图：地块几何 x2（海面世界 264~1416，宽 1152 高 892）", hasTagRect(1152.0, 892.0, "ui"), "sea-rect");
-
+ok("t89 地图：东亚底图海面包围盒（宽 2056 高 1434）", hasTagRect(2056.0, 1434.0, "ui"), "sea-rect");
 // ---- 地图交互（x2 后命中） ----
-clickAt(1240, 290);
-ok("t89 地图交互：点击菱形地块选中北京（几何 x2 后坐标命中）",
+clickAt(1249, 373); snap();
+ok("t89 地图交互：点击选中北京（东亚底图省份命中）",
     objsTextHas("已选：北京").length > 0, oneText("已选"));
 
 // ---- t89 状态层：按下底栏按钮闪覆盖色 ----
@@ -232,15 +230,15 @@ ok("t89 全屏界面：操作 标题=序章 · 2019年的冬天 + 行动点 1 / 
 ok("t89 全屏界面：覆盖整屏（1920x1008 panel 层，底栏导航保留可见）",
     hasTagRect(1920.0, 1008.0, "panel")
     && __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-nav") >= 0; }));
-ok("t89 MD3 圆角：面板/按钮四角 circle 拼接（>=4 个圆角对象）",
-    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0
-        && o.comps.some(function (c) { return c && c.comp === "circle"; }); }).length >= 4);
+ok("t89 MD3 圆角：面板/按钮为原生圆角矩形（radius>0）",
+    __sgObjs.filter(function (o) { return !o.destroyed && (o.tags.indexOf("panel") >= 0 || o.tags.indexOf("ui") >= 0)
+    && o.comps.some(function (c) { return c && c.comp === "rect" && c.radius > 0; }); }).length >= 1);
 ok("t89 全屏界面：左上「‹ 返回地图」按钮", objsTextHas("‹ 返回地图").length > 0);
 ok("t89 MD3 选中态：操作导航项高亮（Primary 色标签 + 指示器 pill 圆角）",
     (__sgObjs.some(function (o) { return !o.destroyed && o.text === "操作"
         && o.comps.some(function (c) { return c && c.comp === "color" && c.r === 166 && c.g === 200 && c.b === 255; }); })
      || __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("ui-nav") >= 0
-        && o.comps.some(function (c) { return c && c.comp === "circle" && c.r === 16.0; }); })), "indicator/primary");
+        && o.comps.some(function (c) { return c && c.comp === "rect" && c.radius > 0; }); })), "indicator/primary");
 ok("序章操作页行=应急预案 + 结束操作（MD3 列表）",
     objsTextHas("应急预案").length > 0 && objsTextHas("结束操作").length > 0);
 

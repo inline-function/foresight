@@ -17,6 +17,8 @@
 @game @host @impure fun compScale(s: Rat): Any
 // 矩形组件：宽/高（像素）。常与 compColorHex 搭配做色块。
 @game @host @impure fun compRect(w: Rat, h: Rat): Any
+// 圆角矩形组件：宽/高/圆角半径（KAPLAY 原生 radius，取代 rect+四圆拼接）。
+@game @host @impure fun compRectR(w: Rat, h: Rat, r: Rat): Any
 // 圆组件：半径（像素）。
 @game @host @impure fun compCircle(r: Rat): Any
 // 文本组件：内容 + 字号（像素）。weight=字重（400/600/700）；width>0 触发 KAPLAY 原生折行
