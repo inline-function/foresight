@@ -364,7 +364,7 @@ fun runSmoke(): Null {
             var ph: Str = engField(st, F_PHASE())
             if (strCmp(ph, "over") == 0) null
             else {
-                    if (strCmp(ph, "events") == 0) { if (strCmp(engField(st, F_DRAWER()), "none") != 0) { st = drawerClose(st) } else null; st = engViewClick(m, st, pressX, pressY) }
+                    if (strCmp(ph, "events") == 0) { if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); st = drawerClose(st) } else null; st = engViewClick(m, st, pressX, pressY) }
                 else {
                     if ((strCmp(engField(st, F_PANEL()), "none") == 0)
                         && (pressX >= AUTO_X()) && (pressX < (AUTO_X() + AUTO_S()))
@@ -376,7 +376,7 @@ fun runSmoke(): Null {
                     } else null
                     var b: Nat = if (consumed) BTN_N() else whichBtn(pressX, pressY)
                     if (b < BTN_N()) {
-                    if (strCmp(engField(st, F_DRAWER()), "none") != 0) { st = drawerClose(st) } else null
+                    if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); st = drawerClose(st) } else null
                         var kind: Str = btnKind(b)
                         if (strCmp(kind, engField(st, F_PANEL())) == 0) {
                             objsDestroyTag("panel")
@@ -421,7 +421,7 @@ fun runSmoke(): Null {
                                                     var s3: Str = engSet(s2, F_DRAWER(), dr0)
                                                     st = if (strCmp(nm, "") != 0) engSet(s3, F_DRAWER(), nm) else drawerClose(s3)
                                                 } else { st = s2 }
-                                            } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else { st = drawerClose(st) } }
+                                            } else { st = drawerClose(st); hit = -1 }
                                         } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else null }
                                     }
                                     var dr1: Str = engField(st, F_DRAWER())
@@ -435,6 +435,13 @@ fun runSmoke(): Null {
                                             if ((strCmp(dr0, dr1) != 0) || (pressX < DR_W())) { drPairs = buildDrawer(m, st); drX = if (strCmp(dr0, "none") == 0) DR_OFF_X() else 0.0 } else null
                                         } else null
                                     }
+                                    if ((strCmp(dr0, "none") != 0) && (strCmp(dr1, "none") == 0)) {
+                                        objsDestroyTag("block")
+                                        sel = -1
+                                        renderBlocks(geo, n, -1)
+                                        objTextSet(label, "")
+                                        hit = -1
+                                    } else null
                                     if ((hit >= 0) && (!seaHit) && (hit != sel)) {
                                         objsDestroyTag("block")
                                         sel = hit

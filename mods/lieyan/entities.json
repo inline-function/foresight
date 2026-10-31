@@ -2656,6 +2656,30 @@
     "海域"
    ],
    "troops": 0
+  },
+  {
+   "id": "block.台湾海峡",
+   "name": "台湾海峡",
+   "owner": "",
+   "pop": 0,
+   "stab": 50,
+   "dev": 3,
+   "tags": [
+    "海域"
+   ],
+   "troops": 0
+  },
+  {
+   "id": "block.对马海峡",
+   "name": "对马海峡",
+   "owner": "",
+   "pop": 0,
+   "stab": 50,
+   "dev": 3,
+   "tags": [
+    "海域"
+   ],
+   "troops": 0
   }
  ]
 }

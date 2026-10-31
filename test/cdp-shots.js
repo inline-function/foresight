@@ -110,7 +110,7 @@ class CDP {
     require("fs").writeFileSync(name, Buffer.from(r.result.data, "base64"));
     console.log("SHOT", name, require("fs").statSync(name).size);
   }
-  await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-open.png", [1233, 379]);
+  await shot("F:\\SublimationProject\\foresight\\test\\shot-home14.png", null);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-move.png", [440, 736]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-moved.png", [1251, 393]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-auto.png", [1636, 44]);

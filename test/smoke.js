@@ -269,13 +269,13 @@ ok("t89 面板滚动：连按两下回顶（首行疫情回到可视区、末行
     objsTextHas("疫情").length > 0 && objsTextHas("科技点").length === 0, "scroll3");
 navBtn(3);
 snap();
-ok("t89 全屏切换：控制地块界面（81 块表，首屏窗口显示 北京市 + 归属 中华人民共和国）",
+ok("t89 全屏切换：控制地块界面（86 块表，首屏窗口显示 北京市 + 归属 中华人民共和国）",
     objsWithText("北京市").length > 0 && objsTextHas("归属 中华人民共和国").length > 0 && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }).length >= 10);
 clickAt(152, 64);
 ok("t89 返回按钮：回到地图主界面（panel 层清空）", !anyPanel() && objsWithText("操作").length > 0);
 // ---- 地块抽屉（海域地块 + 陆地详情 + 驻军移动） ----
 var seaObjs = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("seaprov") >= 0; });
-ok("t89 海域地块渲染（12 块 seaprov 精灵，渲染于陆地之下）", seaObjs.length === 12, "seaprov=" + seaObjs.length);
+ok("t89 海域地块渲染（14 块 seaprov 精灵，渲染于陆地之下）", seaObjs.length === 14, "seaprov=" + seaObjs.length);
 clickAt(1233, 379); snap(); // 北京市形心（世界 1272,354）（视口 999,515 下世界 2x 中心约 1254..1292,340..368）
 
 ok("t89 抽屉打开：北京市 / 归属 / 人口 / 稳定度 / 发展程度 / 标签",
@@ -283,6 +283,11 @@ ok("t89 抽屉打开：北京市 / 归属 / 人口 / 稳定度 / 发展程度 / 
     && objsTextHas("2171 万").length > 0 && objsTextHas("72 / 100").length > 0
     && objsTextHas("9 / 10").length > 0 && objsTextHas("平原").length > 0 && objsTextHas("都市").length > 0,
     oneText("归属 中华人民共和国"));
+clickAt(1501, 665); snap(); // 点击抽屉外（东海方位）-> 抽屉直接收回
+ok("t89 抽屉模态：抽屉打开时点外面直接收回（不切换地块、取消高亮）",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
+    && objsTextHas("已选：").length === 0, "drawer 已选清除");
+clickAt(1233, 379); snap(); // 重新打开北京市抽屉
 ok("t89 抽屉驻军：数量 3 + 移动军队按钮", objsTextHas("移动军队").length > 0);
 clickAt(440, 736); snap(); // 移动军队按钮 -> 进入移动模式（抽屉关闭、地图高亮邻接地）
 ok("t89 移动模式：抽屉关闭 + 地图高亮邻近地块(>=3) + 提示语",
@@ -299,7 +304,8 @@ ok("t89 退出移动模式：点非邻接地 -> 高亮清除、抽屉重开",
     && objsTextHas("驻扎军队").length > 0);
 clickAt(560, 60); snap(); // 关闭 ✕ (520..592, 24..96)
 var drObjs = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; });
-ok("t89 抽屉关闭（drawer 层清空）", drObjs.length === 0, "drawer=" + drObjs.length);
+ok("t89 抽屉关闭：drawer 层清空 + 取消地块高亮（无「已选」标签、无移动模式）",
+    drObjs.length === 0 && objsTextHas("已选：").length === 0 && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0, "drawer=" + drObjs.length);
 clickAt(1501, 665); snap(); // 东海（世界 1540,640；陆地点之外的海域）
 ok("t89 海域抽屉：东海 / 归属公海 / 标签海域 / 舰队可移动",
     objsWithText("东海").length > 0 && objsTextHas("公海").length > 0
