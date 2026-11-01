@@ -308,11 +308,11 @@ fun runSmoke(): Null {
     // 引擎起步：tick 1（相位1 日期推进+资源产出 -> 相位2 玩家操作；队长裁决：进游戏先看地图，
     // 操作/国策/属性/地块界面由底栏按钮切全屏打开）
     st = engTickStart(m, st)
-    // 音频/图标资产预载（TFR 素材；缺失静默）：国策图标（主线 BGM 停用：moving 系列仅移动时随机一首，不循环）
+    // 音频/图标资产预载（TFR 素材；缺失静默）：国策图标 + 主界面 BGM（TFR 主题曲 ogg 循环）
     var l0: Null = spriteLoad("ic-fangcang", "assets/img/ic-fangcang.png")
     var l1: Null = spriteLoad("ic-healthcode", "assets/img/ic-healthcode.png")
     var l2: Null = spriteLoad("ic-rework", "assets/img/ic-rework.png")
-    var au0: Bool = bgmStop()
+    var au0: Bool = bgmPlayId(BGM_MAIN())
     onScroll { dy =>
         var pn: Str = engField(st, F_PANEL())
         var ph: Str = engField(st, F_PHASE())
@@ -351,8 +351,8 @@ fun runSmoke(): Null {
         }
     }
 onUpdate { dt =>
-    // 非事件阶段停 BGM（顶掉事件 BGM 结束循环；moving 系列不作为主界面循环曲）
-    var bm: Bool = if (strCmp(engField(st, F_PHASE()), "events") == 0) false else bgmStop()
+    // 非事件阶段回到主界面 BGM（同名去重；首播被手势拦截则逐帧重试）
+    var bm: Bool = if (strCmp(engField(st, F_PHASE()), "events") == 0) false else bgmPlayId(BGM_MAIN())
     if (drClosing) {
         var nx: Rat = (drX - (DR_SPEED() * dt))
         if (nx <= DR_OFF_X()) { drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0 } else { drX = nx; drShift(drPairs, nx) }

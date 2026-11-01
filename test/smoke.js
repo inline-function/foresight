@@ -543,10 +543,10 @@ ok("随机 op：rndInt(1,8) 已注册且采样落在 [1,8]（含两端、分散>
 ok("音效 op：空名/缺失资产 sndPlay 静默 false（Node 无 Audio）", s1 === false && s2 === false, JSON.stringify([s1, s2]));
 var auDir = path.join(gameDir, "assets", "audio");
 var sfxIds = ["click", "close", "start", "news"].concat([1, 2, 3, 4, 5, 6, 7, 8].map(function (i) { return "mov-" + i; }));
-var bgmIds = ["main", "prologue", "ch1-open", "end-excellent", "end-pass", "end-fail", "end-collapse"];
+var bgmIds = ["prologue", "ch1-open", "end-excellent", "end-pass", "end-fail", "end-collapse"];
 var missFx = sfxIds.filter(function (id) { return !fse.existsSync(path.join(auDir, "sfx-" + id + ".wav")); });
 var missBgm = bgmIds.filter(function (id) { return !fse.existsSync(path.join(auDir, "bgm-" + id + ".wav")); });
-ok("资产落包：sfx-*/bgm-*（11 份 wav）随 build/game/assets", missFx.length === 0 && missBgm.length === 0, missFx.concat(missBgm).join(",") || "all");
+ok("资产落包：sfx-*/bgm-*/bgm-main.ogg（moving 8 + 事件 bgm 6 + 主界面主题曲 ogg）随 build/game/assets", missFx.length === 0 && missBgm.length === 0 && fse.existsSync(path.join(auDir, "bgm-main.ogg")), missFx.concat(missBgm).join(",") || "all");
 var modBgmIds = ev.filter(function (e) { return e.kind === "super" && e.bgm; }).map(function (e) { return e.bgm; });
 var uniqIds = modBgmIds.filter(function (v, k) { return modBgmIds.indexOf(v) === k; });
 var missEv = uniqIds.filter(function (id) { return !fse.existsSync(path.join(auDir, id + ".wav")); });
