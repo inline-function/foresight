@@ -147,6 +147,7 @@ function clickAt(x, y) {
     __sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 }
 function sgFire(dt) { if (globalThis.__sgOnUpdate) globalThis.__sgOnUpdate(dt); }
+function sgFrames(n) { for (var i = 0; i < n; i++) sgFire(1.0); }
 function oneText(sub) {
     var xs = objsTextHas(sub);
     return xs.length >= 1 ? xs[xs.length - 1].text : "（无）";
@@ -173,7 +174,7 @@ function scrollDown() { __sgScrollHandlers.forEach(function (f) { f({ y: 120.0 }
 function scrollUp() { __sgScrollHandlers.forEach(function (f) { f({ y: -120.0 }); }); }
 function anyPanel() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }); }
 function drawerOn() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }); }
-function safeClick(x, y) { if (drawerOn()) { clickAt(700, 540); snap(); } clickAt(x, y); }
+function safeClick(x, y) { if (drawerOn()) { clickAt(560, 60); sgFrames(8); snap(); } clickAt(x, y); }
 var cardViol = 0;
 var scrollOk = false;
 function cardIsUp() {
@@ -215,6 +216,7 @@ function clearEvents(cap) {
         else { if (objsTextHas("返回地图").length > 0) break; else clickAt(960, 532); }
     }
     snap();
+    if (drawerOn()) { clickAt(560, 60); sgFrames(8); snap(); }
 }
 const fse = require("fs");
 const LIE = JSON.parse(fse.readFileSync(__dirname + "/../mods/lieyan/entities.json", "utf8").toString());
@@ -260,7 +262,16 @@ ok("t89 MD3 状态层：按下「操作」闪覆盖色（statelayer 层）",
 __sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 ok("t89 MD3 状态层：松开后覆盖色消失",
     !__sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("statelayer") >= 0; }));
-navBtn(0); snap(); // 打开操作面板（抽屉开启时优先收回抽屉，再点一次开面板）
+ok("t89 抽屉优先：抽屉拉开时抽屉内空白点击无效（抽屉不收、面板不开）", drawerOn() && !anyPanel());
+clickAt(1251, 393); snap(); // 抽屉外：点击天津市形心 -> 抽屉内容切换为该地块（不收回）
+ok("t89 抽屉外点击：点击另一地块 -> 切换抽屉内容（抽屉保持打开）",
+    drawerOn() && objsTextHas("天津市").length > 0, oneText("天津市"));
+clickAt(560, 60); sgFrames(8); snap(); // ✕：唯一关闭途径 -> 动画收回
+sgFire(1.0);
+sgFire(1.0);
+ok("t89 抽屉关闭：仅 ✕ 可关闭（drawer 清空、高亮解除）",
+    !drawerOn() && objsTextHas("已选：").length === 0);
+navBtn(0); snap(); // 抽屉已关 -> 开操作面板
 
 // ---- t89 全屏界面（裁决 6.1）：操作 ----
 ok("t89 全屏界面：操作 标题=序章 · 2019年的冬天 + 行动点 1 / 1",
@@ -319,14 +330,15 @@ ok("t89 抽屉打开：北京市 / 归属 / 人口 / 稳定度 / 发展程度 / 
     && objsTextHas("2171 万").length > 0 && objsTextHas("72 / 100").length > 0
     && objsTextHas("9 / 10").length > 0 && objsTextHas("平原").length > 0 && objsTextHas("都市").length > 0,
     oneText("归属 中华人民共和国"));
-clickAt(1501, 665); snap(); // 点击抽屉外（东海方位）-> 抽屉直接收回
-ok("t89 抽屉模态：抽屉打开时点外面直接收回（不切换地块、取消高亮）",
-    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
-    && objsTextHas("已选：").length === 0, "drawer 已选清除");
+clickAt(1501, 665); snap(); // 抽屉外（东海方位）-> 不自动关闭：仅切换/无操作
+ok("t89 抽屉外点击：不自动关闭抽屉（只有 ✕ 能关；点击地图只切换地块内容）", drawerOn() === true);
 clickAt(1233, 379); snap(); // 重新打开北京市抽屉
-clickAt(240, 1044); snap(); // 抽屉开启时点底栏「操作」-> 抽屉优先：仅收回抽屉
-ok("t89 抽屉优先：抽屉开启时底栏导航被抽屉拦截（面板不开、仅收回抽屉）",
-    drawerOn() === false && objsTextHas("行动点").length === 0);
+navBtn(0); snap(); // 底栏「操作」被抽屉遮住 -> 点击落入抽屉（无动作）
+ok("t89 抽屉优先：抽屉压住底栏「操作」时点击无效（面板不开、抽屉不收）", drawerOn() && !anyPanel());
+navBtn(1); snap(); // 未被遮住的「国策」-> 开全屏面板（抽屉随模式切换收回）
+ok("t89 模式切换：开全屏面板时抽屉收回（高亮解除）", anyPanel() && !drawerOn() && objsTextHas("已选：").length === 0);
+clickAt(152, 64); snap(); // 返回地图
+clickAt(1233, 379); snap(); // 重新打开北京市抽屉
 clickAt(1233, 379); snap(); // 拦截后重新打开北京市抽屉
 ok("t89 抽屉驻军：数量 3 + 移动军队按钮", objsTextHas("移动军队").length > 0);
 clickAt(440, 736); snap(); // 移动军队按钮 -> 进入移动模式（抽屉关闭、地图高亮邻接地）
@@ -334,15 +346,19 @@ ok("t89 移动模式：抽屉关闭 + 地图高亮邻近地块(>=3) + 提示语"
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
     && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3
     && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0, oneText("移动军队："));
-clickAt(1251, 393); snap(); // 高亮的天津市形心（2x 世界 645,184）
-ok("t89 驻军移动：点击高亮地块 -> 已移动 1 支军队至 天津市（北京市 2/天津市 2）",
-    objsTextHas("已移动 1 支军队至 天津市").length > 0
-    && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3);
-clickAt(1233, 379); snap(); // 北京（非邻接）-> 退出移动模式并开抽屉
+clickAt(1251, 393); snap(); // 高亮的天津市形心 -> 移动 1 支军队 -> 抽屉收回 + 解除高亮
+ok("t89 驻军移动：移动后抽屉收回、高亮解除（无抽屉/movetarget=0/无已选标签）",
+    !drawerOn() && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0 && objsTextHas("已选：").length === 0);
+clickAt(1233, 379); snap(); // 重开北京市抽屉验兵力
+ok("t89 驻军移动：北京驻军 3 -> 2（抽屉重开、移动军队按钮仍可用）",
+    objsTextHas("驻扎军队").length > 0 && objsTextHas("移动军队").length > 0);
+clickAt(440, 736); snap(); // 再次进入移动模式
+ok("t89 移动模式重入：高亮邻接地 >= 3 + 提示语",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3 && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0);
+clickAt(1233, 379); snap(); // 点非邻接地（北京自身）-> 退出移动模式、抽屉重开
 ok("t89 退出移动模式：点非邻接地 -> 高亮清除、抽屉重开",
-    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0
-    && objsTextHas("驻扎军队").length > 0);
-clickAt(560, 60); snap(); // 关闭 ✕ (520..592, 24..96)
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0 && objsTextHas("驻扎军队").length > 0);
+clickAt(560, 60); sgFrames(8); snap(); // 关闭 ✕ (520..592, 24..96)
 var drObjs = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; });
 ok("t89 抽屉关闭：drawer 层清空 + 取消地块高亮（无「已选」标签、无移动模式）",
     drObjs.length === 0 && objsTextHas("已选：").length === 0 && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0, "drawer=" + drObjs.length);
@@ -351,7 +367,7 @@ ok("t89 海域抽屉：东海 / 归属公海 / 标签海域 / 舰队可移动",
     objsWithText("东海").length > 0 && objsTextHas("公海").length > 0
     && objsTextHas("海域").length > 0 && objsTextHas("移动军队").length > 0,
     oneText("公海"));
-clickAt(560, 60); snap(); // 关闭海域抽屉
+clickAt(560, 60); sgFrames(8); snap(); // 关闭海域抽屉（动画收回）
 navBtn(0);
 ok("t89 返回后保持操作状态：操作主面板仍在（行动点 1/1 未扣，SEL/AP 状态保留）",
     objsTextHas("应急预案").length > 0 && objsTextHas("行动点 1 / 1").length > 0);
@@ -389,7 +405,7 @@ navBtn(0);
 ok("t89 流逝按钮：顶栏右侧 ui-auto（文案「流逝」）", objsWithText("流逝").length > 0);
 var dOps = oneText("2019 年");
 clickAt(1504, 44); snap(); // 开
-sgFire(1.0); sgFire(1.0);
+sgFrames(8);
 ok("t89 自动流逝：ops 阶段自动暂停（日期未跳天）", oneText("2019 年") === dOps, dOps + " -> " + oneText("2019 年"));
 clickAt(1504, 44); snap(); // 关
 ok("第一章：操作面板=第一章 · 疫情时期 行动点 3 / 3",

@@ -25,7 +25,6 @@ fun drawerClose(s: Str): Str {
     objsDestroyTag("drawer")
     return engSet(s, F_DRAWER(), "none")
 }
-
 // ---------- 地块数据 ----------
 @impure
 fun regionOf(blocks: Json, name: Str): Json =
@@ -117,10 +116,10 @@ fun buildDrawer(m: Json, st: Str): List[(Any, Rat, Rat)] {
         p = cons((addTextT(drNum(trps), 40.0, 700.0, 46.0, 700, DR_TXT(), "drawer", true, DR_Z()), 40.0, 700.0), p)
         if (trps > 0.0) {
             p = cons((addRoundRect(260.0, 64.0, 320.0, 704.0, DR_PRI(), "drawer", DR_Z(), 20.0), 320.0, 704.0), p)
-            p = cons((addTextT("移动军队", 356.0, 720.0, 27.0, 700, DR_ONPRI(), "drawer", true, DR_Z()), 356.0, 720.0), p)
+            p = cons((addTextT("移动军队", 385.0, 722.0, 27.0, 700, DR_ONPRI(), "drawer", true, DR_Z()), 385.0, 725.0), p)
         } else {
             p = cons((addRoundRect(260.0, 64.0, 320.0, 704.0, DR_LINE(), "drawer", DR_Z(), 20.0), 320.0, 704.0), p)
-            p = cons((addTextT("无可移动军队", 340.0, 722.0, 22.0, 400, DR_SUB(), "drawer", true, DR_Z()), 340.0, 722.0), p)
+            p = cons((addTextT("无可移动军队", 371.0, 722.0, 22.0, 400, DR_SUB(), "drawer", true, DR_Z()), 371.0, 727.5), p)
         }
 
     return p

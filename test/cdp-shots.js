@@ -99,7 +99,7 @@ class CDP {
   await c.send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await c.send("Page.navigate", { url: "http://localhost:8182/index.html" });
   console.log("NAV-DONE");
-  await new Promise(r => setTimeout(r, 4000));
+  await new Promise(r => setTimeout(r, 9000));
   async function shot(name, click) {
     if (click) {
       await c.send("Input.dispatchMouseEvent", { type: "mousePressed", x: click[0], y: click[1], button: "left", clickCount: 1 });
@@ -111,9 +111,13 @@ class CDP {
     console.log("SHOT", name, require("fs").statSync(name).size);
   }
   await shot("F:\\SublimationProject\\foresight\\test\\shot-home14.png", null);
+  await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-open.png", [1233, 379]);
+  await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-sea.png", [1501, 665]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-move.png", [440, 736]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-moved.png", [1251, 393]);
+  await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-open2.png", [1233, 379]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-auto.png", [1636, 44]);
+  await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-closed.png", [560, 60]);
   edge.kill();
   process.exit(0);
 })().catch(e => { console.log("ERR", e.message.slice(0, 200)); process.exit(1); });

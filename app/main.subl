@@ -269,6 +269,7 @@ fun runSmoke(): Null {
     unchecked objTag(bg, "ui")
     @mut var sel: Int = -1
     @mut var drX: Rat = 0.0
+    @mut var drClosing: Bool = false
     @mut var drPairs: List[(Any, Rat, Rat)] = emptyList()
     @mut var autoOn: Bool = false
     @mut var autoAcc: Rat = 0.0
@@ -331,11 +332,15 @@ fun runSmoke(): Null {
         }
         }
     }
-    onUpdate { dt => if (drX < 0.0) {
-        var nx: Rat = (drX + (DR_SPEED() * dt))
-        drX = if (nx > 0.0) 0.0 else nx
+onUpdate { dt =>
+    if (drClosing) {
+        var nx: Rat = (drX - (DR_SPEED() * dt))
+        if (nx <= DR_OFF_X()) { drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0 } else { drX = nx; drShift(drPairs, nx) }
+    } else { if (drX < 0.0) {
+        var nx2: Rat = (drX + (DR_SPEED() * dt))
+        drX = if (nx2 > 0.0) 0.0 else nx2
         drShift(drPairs, drX)
-    } else null;
+    } else null };
     if (autoOn) {
         autoAcc = autoAcc + dt
         if (autoAcc >= 1.0) {
@@ -362,7 +367,7 @@ fun runSmoke(): Null {
         var dx: Rat = distAbs(mx, pressX)
         var dy2: Rat = distAbs(my, pressY)
         if ((!moved) && ((dx > DRAG_THRESHOLD()) || (dy2 > DRAG_THRESHOLD()))) { moved = true }
-        if ((moved) && (strCmp(engField(st, F_DRAWER()), "none") == 0)) {
+        if ((moved) && ((strCmp(engField(st, F_DRAWER()), "none") == 0) || (pressX >= DR_W()))) {
             viewX = panXOf(viewS, viewX, (mx - lastX))
             viewY = panYOf(viewS, viewY, (my - lastY))
             applyView(viewS, viewX, viewY)
@@ -378,25 +383,34 @@ fun runSmoke(): Null {
             if (strCmp(ph, "over") == 0) null
             else {
                 if ((strCmp(engField(st, F_DRAWER()), "none") != 0) && (!startsWith(engField(st, F_DRAWER()), "m:"))) {
-                    @mut var dr1: Str = engField(st, F_DRAWER())
                     if (pressX < DR_W()) {
-                        st = drawerHit(m, st, pressX, pressY)
-                        dr1 = engField(st, F_DRAWER())
-                        if (strCmp(dr1, "pass") == 0) { st = drawerClose(st); dr1 = "none" } else null
-                    } else { st = drawerClose(st); dr1 = "none" }
-                    if (strCmp(dr1, "none") == 0) {
-                        objsDestroyTag("block")
-                        sel = -1
-                        renderBlocks(geo, n, -1)
-                        objTextSet(label, "")
-                    } else { if (startsWith(dr1, "m:")) {
-                        objsDestroyTag("drawer")
-                        drawMoveHi(geo, n, geoSea, nSea, drawerNameOf(dr1))
-                        objTextSet(label, concat(concat("移动军队：点击高亮地块（", drawerNameOf(dr1)), "）"))
-                    } else null }
-                    consumed = true
+                        if ((pressX >= 520.0) && (pressX < 592.0) && (pressY >= 24.0) && (pressY < 96.0)) {
+                            drClosing = true
+                            st = engSet(st, F_DRAWER(), "none")
+                            objsDestroyTag("block")
+                            sel = -1
+                            renderBlocks(geo, n, -1)
+                            objTextSet(label, "")
+                        } else {
+                        var s2: Str = drawerHit(m, st, pressX, pressY)
+                        var d2: Str = engField(s2, F_DRAWER())
+                        st = if (strCmp(d2, "pass") == 0) st else s2
+                        if (strCmp(d2, "none") == 0) {
+                            objsDestroyTag("block")
+                            sel = -1
+                            renderBlocks(geo, n, -1)
+                            objTextSet(label, "")
+                        } else null
+                        if (startsWith(d2, "m:")) {
+                            drClosing = false; drPairs = emptyList(); drX = 0.0; objsDestroyTag("drawer")
+                            drawMoveHi(geo, n, geoSea, nSea, drawerNameOf(d2))
+                            objTextSet(label, concat(concat("移动军队：点击高亮地块（", drawerNameOf(d2)), "）"))
+                        } else null
+                        }
+                        consumed = true
+                    } else null
                 } else null
-                    if (strCmp(ph, "events") == 0) { if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); st = drawerClose(st) } else null; st = engViewClick(m, st, pressX, pressY) }
+                    if (strCmp(ph, "events") == 0) { if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0; st = engSet(st, F_DRAWER(), "none") } else null; st = engViewClick(m, st, pressX, pressY) }
                 else {
                     if ((strCmp(engField(st, F_PANEL()), "none") == 0)
                         && (pressX >= AUTO_X()) && (pressX < (AUTO_X() + AUTO_S()))
@@ -408,7 +422,7 @@ fun runSmoke(): Null {
                     } else null
                     var b: Nat = if (consumed) BTN_N() else whichBtn(pressX, pressY)
                     if (b < BTN_N()) {
-                    if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); st = drawerClose(st) } else null
+                    if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0; st = engSet(st, F_DRAWER(), "none") } else null
                         var kind: Str = btnKind(b)
                         if (strCmp(kind, engField(st, F_PANEL())) == 0) {
                             objsDestroyTag("panel")
@@ -443,28 +457,21 @@ fun runSmoke(): Null {
                                         var nbs: List[Str] = adjNames(src)
                                         if ((strCmp(nm, "") != 0) && (strCmp(nm, src) != 0) && nameInList(nbs, 0, size(nbs), nm)) {
                                             st = drawerMoveOne(m, st, src, nm)
-                                            objTextSet(label, concat("已移动 1 支军队至 ", nm))
-                                        } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else { objsDestroyTag("movetarget"); st = engSet(st, F_DRAWER(), "none") } }
-                                    } else {
-                                        if (strCmp(dr0, "none") != 0) {
-                                            if (pressX < DR_W()) {
-                                                var s2: Str = drawerHit(m, st, pressX, pressY)
-                                                if (strCmp(engField(s2, F_DRAWER()), "pass") == 0) {
-                                                    var s3: Str = engSet(s2, F_DRAWER(), dr0)
-                                                    st = if (strCmp(nm, "") != 0) engSet(s3, F_DRAWER(), nm) else drawerClose(s3)
-                                                } else { st = s2 }
-                                            } else { st = drawerClose(st); hit = -1 }
+                                            drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0; st = engSet(st, F_DRAWER(), "none")
+                                            objTextSet(label, "")
                                         } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else null }
+                                    } else {
+                                        if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else null
                                     }
                                     var dr1: Str = engField(st, F_DRAWER())
                                     if (startsWith(dr1, "m:")) {
-                                        objsDestroyTag("drawer")
+                                        drClosing = false; drPairs = emptyList(); drX = 0.0; objsDestroyTag("drawer")
                                         if (!startsWith(dr0, "m:")) { drawMoveHi(geo, n, geoSea, nSea, drawerNameOf(dr1)) } else null
                                         if (!startsWith(dr0, "m:")) { objTextSet(label, concat(concat("移动军队：点击高亮地块（", drawerNameOf(dr1)), "）")) } else null
                                     } else {
                                         objsDestroyTag("movetarget")
                                         if (strCmp(dr1, "none") != 0) {
-                                            if ((strCmp(dr0, dr1) != 0) || (pressX < DR_W())) { drPairs = buildDrawer(m, st); drX = if (strCmp(dr0, "none") == 0) DR_OFF_X() else 0.0 } else null
+                                            if ((strCmp(dr0, dr1) != 0) || (pressX < DR_W())) { drClosing = false; objsDestroyTag("drawer"); drPairs = buildDrawer(m, st); drX = if (strCmp(dr0, "none") == 0) DR_OFF_X() else 0.0 } else null
                                         } else null
                                     }
                                     if ((strCmp(dr0, "none") != 0) && (strCmp(dr1, "none") == 0)) {
