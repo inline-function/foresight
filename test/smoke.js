@@ -172,6 +172,8 @@ function pickOption(i) { clickAt(960, rowY(i)); }
 function scrollDown() { __sgScrollHandlers.forEach(function (f) { f({ y: 120.0 }); }); }
 function scrollUp() { __sgScrollHandlers.forEach(function (f) { f({ y: -120.0 }); }); }
 function anyPanel() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }); }
+function drawerOn() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }); }
+function safeClick(x, y) { if (drawerOn()) { clickAt(700, 540); snap(); } clickAt(x, y); }
 function clearEvents(cap) {
     for (var i = 0; i < cap; i++) {
         snap();
@@ -225,6 +227,7 @@ ok("t89 MD3 状态层：按下「操作」闪覆盖色（statelayer 层）",
 __sgMouseHandlers.release.forEach(function (h) { if (h.b === "left") h.f({ button: "left" }); });
 ok("t89 MD3 状态层：松开后覆盖色消失",
     !__sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("statelayer") >= 0; }));
+navBtn(0); snap(); // 打开操作面板（抽屉开启时优先收回抽屉，再点一次开面板）
 
 // ---- t89 全屏界面（裁决 6.1）：操作 ----
 ok("t89 全屏界面：操作 标题=序章 · 2019年的冬天 + 行动点 1 / 1",
@@ -288,6 +291,10 @@ ok("t89 抽屉模态：抽屉打开时点外面直接收回（不切换地块、
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
     && objsTextHas("已选：").length === 0, "drawer 已选清除");
 clickAt(1233, 379); snap(); // 重新打开北京市抽屉
+clickAt(240, 1044); snap(); // 抽屉开启时点底栏「操作」-> 抽屉优先：仅收回抽屉
+ok("t89 抽屉优先：抽屉开启时底栏导航被抽屉拦截（面板不开、仅收回抽屉）",
+    drawerOn() === false && objsTextHas("行动点").length === 0);
+clickAt(1233, 379); snap(); // 拦截后重新打开北京市抽屉
 ok("t89 抽屉驻军：数量 3 + 移动军队按钮", objsTextHas("移动军队").length > 0);
 clickAt(440, 736); snap(); // 移动军队按钮 -> 进入移动模式（抽屉关闭、地图高亮邻接地）
 ok("t89 移动模式：抽屉关闭 + 地图高亮邻近地块(>=3) + 提示语",
@@ -372,11 +379,11 @@ clickAt(1636, 44); snap(); // 关
 
 // ---- 第一章 17+1 tick 循环（auto 1 次 + 手动 17 次；净 +3/tick -> 失败档） ----
 for (var t = 1; t <= 17; t++) {
-    navBtn(0);
+    safeClick(240, 1044);
     openPage(0); pickOption(2);   // 局部封控
-    clickAt(960, rowY(4));        // 返回操作页
+    safeClick(960, rowY(4));        // 返回操作页
     openPage(1); pickOption(1);   // 精准滴灌
-    clickAt(960, rowY(3));        // 返回操作页
+    safeClick(960, rowY(3));        // 返回操作页
     openPage(2); pickOption(1);   // 适度淡化 -> AP 0 -> 自动结算
     clearEvents(80);
 }

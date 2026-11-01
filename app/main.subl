@@ -349,7 +349,7 @@ fun runSmoke(): Null {
         var dx: Rat = distAbs(mx, pressX)
         var dy2: Rat = distAbs(my, pressY)
         if ((!moved) && ((dx > DRAG_THRESHOLD()) || (dy2 > DRAG_THRESHOLD()))) { moved = true }
-        if (moved) {
+        if ((moved) && (strCmp(engField(st, F_DRAWER()), "none") == 0)) {
             viewX = panXOf(viewS, viewX, (mx - lastX))
             viewY = panYOf(viewS, viewY, (my - lastY))
             applyView(viewS, viewX, viewY)
@@ -364,6 +364,25 @@ fun runSmoke(): Null {
             var ph: Str = engField(st, F_PHASE())
             if (strCmp(ph, "over") == 0) null
             else {
+                if ((strCmp(engField(st, F_DRAWER()), "none") != 0) && (!startsWith(engField(st, F_DRAWER()), "m:"))) {
+                    @mut var dr1: Str = engField(st, F_DRAWER())
+                    if (pressX < DR_W()) {
+                        st = drawerHit(m, st, pressX, pressY)
+                        dr1 = engField(st, F_DRAWER())
+                        if (strCmp(dr1, "pass") == 0) { st = drawerClose(st); dr1 = "none" } else null
+                    } else { st = drawerClose(st); dr1 = "none" }
+                    if (strCmp(dr1, "none") == 0) {
+                        objsDestroyTag("block")
+                        sel = -1
+                        renderBlocks(geo, n, -1)
+                        objTextSet(label, "")
+                    } else { if (startsWith(dr1, "m:")) {
+                        objsDestroyTag("drawer")
+                        drawMoveHi(geo, n, geoSea, nSea, drawerNameOf(dr1))
+                        objTextSet(label, concat(concat("移动军队：点击高亮地块（", drawerNameOf(dr1)), "）"))
+                    } else null }
+                    consumed = true
+                } else null
                     if (strCmp(ph, "events") == 0) { if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); st = drawerClose(st) } else null; st = engViewClick(m, st, pressX, pressY) }
                 else {
                     if ((strCmp(engField(st, F_PANEL()), "none") == 0)
