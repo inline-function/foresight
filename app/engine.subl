@@ -272,13 +272,39 @@ fun policyRow(ent: Json, i: Nat): Json = arrAt(policies(ent), i)
 @impure
 fun policyAcquired(ent: Json, s: Str, i: Nat): Bool =
     strHas(engField(s, F_FLAGS()), jstr(policyRow(ent, i), "id"))
+// 前置列表：prereq.list（HOI4 式树）优先，回退 requires（旧格式）
+@impure
+fun policyPrereqList(ent: Json, i: Nat): Json {
+    var pr: Json = jk(policyRow(ent, i), "prereq")
+    return if (arrLen(jk(pr, "list")) > 0) jk(pr, "list") else jk(policyRow(ent, i), "requires")
+}
+// 前置模式：any=至少一个完成（HOI4 分支合流）；all=全部完成（默认）
+@impure
+fun policyPrereqMode(ent: Json, i: Nat): Str =
+    if (strCmp(jstr(jk(policyRow(ent, i), "prereq"), "mode"), "any") == 0) "any" else "all"
+@impure
+fun policyMutexList(ent: Json, i: Nat): Json = jk(policyRow(ent, i), "mutex")
+// 任一前置完成（any 语义；mutex 锁定也用它判定）
+@impure
+fun policyReqAnyLoop(ent: Json, s: Str, req: Json, i: Nat, n: Nat): Bool =
+    if (i >= n) false
+    else (if (strHas(engField(s, F_FLAGS()), strOr(jsonStr(arrAt(req, i)), ""))) true else policyReqAnyLoop(ent, s, req, (i + 1), n))
 @impure
 fun policyReqLoop(ent: Json, s: Str, req: Json, i: Nat, n: Nat): Bool =
     if (i >= n) true
     else (if (!strHas(engField(s, F_FLAGS()), strOr(jsonStr(arrAt(req, i)), ""))) false else policyReqLoop(ent, s, req, (i + 1), n))
+// 互斥锁定：mutex 列表里有任一已行 -> 永久锁定
+@impure
+fun policyMutexLocked(ent: Json, s: Str, i: Nat): Bool =
+    policyReqAnyLoop(ent, s, policyMutexList(ent, i), 0, arrLen(policyMutexList(ent, i)))
 @impure
 fun policyCanAcquire(ent: Json, s: Str, i: Nat): Bool =
-    policyReqLoop(ent, s, jk(policyRow(ent, i), "requires"), 0, arrLen(jk(policyRow(ent, i), "requires")))
+    if (policyMutexLocked(ent, s, i)) false
+    else {
+        var rq: Json = policyPrereqList(ent, i)
+        var md: Bool = (strCmp(policyPrereqMode(ent, i), "any") == 0)
+        if (md) policyReqAnyLoop(ent, s, rq, 0, arrLen(rq)) else policyReqLoop(ent, s, rq, 0, arrLen(rq))
+    }
 
 // ---------- 状态机构造 ----------
 @impure

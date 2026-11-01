@@ -186,6 +186,48 @@
      "n": 4
     }
    ]
+  },
+  {
+   "id": "policy.detection",
+   "name": "扩大核酸检测",
+   "prereq": {
+    "mode": "any",
+    "list": [
+     "policy.fangcang",
+     "policy.healthcode"
+    ]
+   },
+   "mutex": [
+    "policy.austerity"
+   ],
+   "effects": [
+    {
+     "op": "res",
+     "v": "res.medical",
+     "n": 10
+    }
+   ]
+  },
+  {
+   "id": "policy.austerity",
+   "name": "紧缩节流",
+   "prereq": {
+    "mode": "any",
+    "list": [
+     "policy.fangcang",
+     "policy.healthcode"
+    ]
+   },
+   "mutex": [
+    "policy.detection"
+   ],
+   "effects": [
+    {
+     "op": "res",
+     "v": "res.economy",
+     "n": 6
+    }
+   ]
   }
  ],
  "chapters": [

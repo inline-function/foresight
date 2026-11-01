@@ -158,20 +158,109 @@ fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
 // 政策行图标（TFR 素材：方舱医院=疫苗研发、健康码体系=数字化、复工指导=地方复苏）
 fun policyIconName(i: Nat): Str = if (i == 0) "ic-fangcang" else (if (i == 1) "ic-healthcode" else (if (i == 2) "ic-rework" else ""))
 fun policyIconScale(i: Nat): Rat = if (i == 0) 0.5 else (if (i == 1) 0.48 else (if (i == 2) 0.42 else 1.0))
+// ---------- 国策树布局（HOI4 式：前置深度分层，同列按序竖排） ----------
+fun TREE_X0(): Rat = 96.0
+fun TREE_Y0(): Rat = 196.0
+fun NT_W(): Rat = 372.0
+fun NT_H(): Rat = 96.0
+fun NT_CX(): Rat = 472.0
+fun NT_CY(): Rat = 132.0
+fun EDGE_HEX(): Str = "#5A6470"
+fun NODE_DONE(): Str = "#1F5130"
+fun NODE_CAN(): Str = "#1E4D78"
+fun NODE_LOCK(): Str = "#4A2323"
+fun NODE_WAIT(): Str = "#2A2F35"
+fun ON_DONE(): Str = "#DDE9DC"
+fun ON_CAN(): Str = "#CFE2F5"
+// 列（深度）：无前置=0；否则 max(父列)+1。父缺失以哨兵 n 计 0 层
+@impure
+fun policyColOf(ent: Json, i: Nat): Nat =
+    policyDepthMax(ent, policyPrereqList(ent, i), 0, arrLen(policyPrereqList(ent, i)), 0)
+@impure
+fun policyDepthMax(ent: Json, req: Json, k: Nat, n: Nat, acc: Nat): Nat =
+    if (k >= n) acc
+    else {
+        var pid: Nat = policyIdIndex(ent, strOr(jsonStr(arrAt(req, k)), ""), 0, policyCount(ent))
+        var d: Nat = if (pid >= policyCount(ent)) 0 else (policyColOf(ent, pid) + 1)
+        policyDepthMax(ent, req, (k + 1), n, if (d > acc) d else acc)
+    }
+@impure
+fun policyIdIndex(ent: Json, id: Str, i: Nat, n: Nat): Nat =
+    if (i >= n) n
+    else (if (strCmp(jstr(policyRow(ent, i), "id"), id) == 0) i else policyIdIndex(ent, id, (i + 1), n))
+// 行：同列且在 i 之前的数量
+@impure
+fun policyRowOf(ent: Json, i: Nat): Nat =
+    policyRowCount(ent, policyColOf(ent, i), 0, i, 0)
+@impure
+fun policyRowCount(ent: Json, col: Nat, j: Nat, lim: Nat, acc: Nat): Nat =
+    if (j >= lim) acc
+    else policyRowCount(ent, col, (j + 1), lim, if (policyColOf(ent, j) == col) (acc + 1) else acc)
+@impure
+fun policyBoxX(ent: Json, i: Nat): Rat = (TREE_X0() + (NT_CX() * toRat(policyColOf(ent, i))))
+@impure
+fun policyBoxY(ent: Json, i: Nat, off: Nat): Rat = (TREE_Y0() + (NT_CY() * toRat(policyRowOf(ent, i))) - (ROW_DY() * toRat(off)))
+// ---------- 连线（父右中 -> 子左中，三段直角折线） ----------
+@impure
+fun drawTreeEdgesLoop(ent: Json, i: Nat, req: Json, k: Nat, n: Nat, off: Nat): Null =
+    if (k >= n) null
+    else {
+        var pid: Nat = policyIdIndex(ent, strOr(jsonStr(arrAt(req, k)), ""), 0, policyCount(ent))
+        if (pid < policyCount(ent)) { drawTreeEdge(ent, pid, i, off) } else null
+        drawTreeEdgesLoop(ent, i, req, (k + 1), n, off)
+    }
+@impure
+fun drawTreeEdge(ent: Json, p: Nat, c: Nat, off: Nat): Null {
+    var px: Rat = (policyBoxX(ent, p) + NT_W())
+    var py: Rat = (policyBoxY(ent, p, off) + (NT_H() / 2.0))
+    var cx: Rat = policyBoxX(ent, c)
+    var cy: Rat = (policyBoxY(ent, c, off) + (NT_H() / 2.0))
+    var mx: Rat = ((px + cx) / 2.0)
+    var h1: Any = addRectT((mx - px), 3.0, px, (py - 1.5), EDGE_HEX(), "panel", 30.0)
+    var v: Any = if (cy > py) addRectT(3.0, (cy - py), (mx - 1.5), py, EDGE_HEX(), "panel", 30.0) else addRectT(3.0, (py - cy), (mx - 1.5), cy, EDGE_HEX(), "panel", 30.0)
+    var h2: Any = addRectT((cx - mx), 3.0, mx, (cy - 1.5), EDGE_HEX(), "panel", 30.0)
+    null
+}
+// ---------- 锁定原因文本 ----------
+@impure
+fun policyNamesOf(ent: Json, req: Json, i: Nat, n: Nat, sep: Str): Str =
+    if (i >= n) ""
+    else {
+        var nm: Str = lookupName(policies(ent), strOr(jsonStr(arrAt(req, i)), ""))
+        var part: Str = if (strCmp(nm, "") == 0) "" else nm
+        var rest: Str = policyNamesOf(ent, req, (i + 1), n, sep)
+        if (strCmp(part, "") == 0) rest else (if (strCmp(rest, "") == 0) part else concat(concat(part, sep), rest))
+    }
+@impure
+fun policyLockText(ent: Json, s: Str, i: Nat): Str =
+    if (policyMutexLocked(ent, s, i)) concat("与【", concat(policyNamesOf(ent, policyMutexList(ent, i), 0, arrLen(policyMutexList(ent, i)), "/"), "】互斥"))
+    else {
+        var rq: Json = policyPrereqList(ent, i)
+        if (arrLen(rq) == 0) ""
+        else (if (strCmp(policyPrereqMode(ent, i), "any") == 0) concat("需任一：", policyNamesOf(ent, rq, 0, arrLen(rq), " 或 ")) else concat("前置：", policyNamesOf(ent, rq, 0, arrLen(rq), "、")))
+    }
+// ---------- 树渲染 ----------
 @impure
 fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
-    if ((i >= n) || ((rowYOf(i, off) + ROW_H()) > NAV_Y())) null
+    if (i >= n) null
     else {
         var ent: Json = modEnt(m)
         var acq: Bool = policyAcquired(ent, s, i)
-        var mark: Str = if (acq) "已行" else (if (policyCanAcquire(ent, s, i)) "可解" else "锁定")
-        var nm: Str = jstr(policyRow(ent, i), "name")
-        var row: Any = fsRow(i, off, acq)
-        var icn: Str = policyIconName(i)
-        if (strCmp(icn, "") != 0) { addIconT(icn, (ROW_X() + 16.0), (rowYOf(i, off) + 9.0), policyIconScale(i), "panel", 32.0) } else null
-        var mt: Any = addTextT(concat(concat(mark, " "), nm), (ROW_X() + 124.0), (rowYOf(i, off) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
-        var st: Any = addTextT(policyReqText(ent, i), (ROW_X() + 124.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
-        renderPolicyRows(m, s, (i + 1), n, off)
+        var lck: Bool = policyMutexLocked(ent, s, i)
+        var can: Bool = ((!acq) && (!lck) && policyCanAcquire(ent, s, i))
+        var x: Rat = policyBoxX(ent, i)
+        var y: Rat = policyBoxY(ent, i, off)
+        if ((y + NT_H()) > NAV_Y()) null
+        else {
+            drawTreeEdgesLoop(ent, i, policyPrereqList(ent, i), 0, arrLen(policyPrereqList(ent, i)), off)
+            var box: Any = addRoundRect(NT_W(), NT_H(), x, y, if (acq) NODE_DONE() else (if (can) NODE_CAN() else (if (lck) NODE_LOCK() else NODE_WAIT())), "panel", 32.0, 16.0)
+            var icn: Str = policyIconName(i)
+            if (strCmp(icn, "") != 0) { addIconT(icn, (x + 16.0), (y + 12.0), policyIconScale(i), "panel", 33.0) } else null
+            var mark: Str = if (acq) "已行" else (if (can) "可解" else (if (lck) "互斥" else "锁定"))
+            var mt: Any = addTextT(concat(concat(mark, " "), jstr(policyRow(ent, i), "name")), (x + 128.0), (y + 16.0), 28.0, 600, if (acq) ON_DONE() else (if (can) ON_CAN() else TXT_VAR()), "panel", true, 33.0)
+            var st: Any = addTextT(policyLockText(ent, s, i), (x + 128.0), (y + 56.0), 19.0, 400, if (acq) ON_DONE() else TXT_VAR(), "panel", true, 33.0)
+            renderPolicyRows(m, s, (i + 1), n, off)
+        }
     }
 @impure
 fun policyReqText(ent: Json, i: Nat): Str =
@@ -198,11 +287,20 @@ fun renderBlocksRows(m: Json, i: Nat, n: Nat, off: Nat): Null =
     }
 @impure
 fun policyPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
-    var n: Nat = policyCount(modEnt(m))
+    var ent: Json = modEnt(m)
+    var n: Nat = policyCount(ent)
     var off: Nat = engNum(s, F_SCROLL())
-    var ri: Nat = panelRowHit(my, n, off)
+    var ri: Nat = policyTreeHit(ent, mx, my, off, 0, n)
     return (if (ri < n) engPolicyAcquire(m, s, ri) else s)
 }
+@impure
+fun policyTreeHit(ent: Json, mx: Rat, my: Rat, off: Nat, i: Nat, n: Nat): Nat =
+    if (i >= n) n
+    else {
+        var x: Rat = policyBoxX(ent, i)
+        var y: Rat = policyBoxY(ent, i, off)
+        if ((mx >= x) && (mx < (x + NT_W())) && (my >= y) && (my < (y + NT_H()))) i else policyTreeHit(ent, mx, my, off, (i + 1), n)
+    }
 
 // ---------- 操作：页列表（MD3 列表 + 结束操作行） ----------
 @impure
