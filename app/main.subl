@@ -473,7 +473,7 @@ onUpdate { dt =>
                             else { st = renderPanelKind(m, st, kind) }
                         }
                     } else {
-                        if ((strCmp(engField(st, F_PANEL()), "none") != 0) && panelBackHit(pressX, pressY)) {
+                        if ((strCmp(engField(st, F_PANEL()), "none") != 0) && (engNum(st, F_PSEL()) == 0) && panelBackHit(pressX, pressY)) {
                             var sb: Bool = sfxPlay("close")
                             objsDestroyTag("panel")
                             st = engSet(st, F_PANEL(), "none")

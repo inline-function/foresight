@@ -308,6 +308,14 @@ ok("t90 对话框：点节点弹出详情（名称标题/描述/需要=无前置
     objsTextHas("无前置，可直接实施").length > 0 && objsTextHas("医疗资源 +20").length > 0
     && objsTextHas("14 天").length > 0 && objsTextHas("建设临时医疗设施").length > 0
     && objsTextHas("实施").length > 0, oneText("方舱医院"));
+clickAt(706, 316); snap(); // 对话框卡片内下层树节点位置 -> 拦截，对话框不切换
+ok("t90 对话框遮挡：点卡片内下层树节点被拦截（仍是方舱医院详情、不切到检测）",
+    objsTextHas("无前置，可直接实施").length > 0 && objsTextHas("需任一完成：方舱医院 / 健康码体系").length === 0,
+    oneText("无前置"));
+clickAt(500, 500); snap(); // 卡片外（树区）-> 关闭对话框回树
+ok("t90 对话框遮挡：卡片外点击关闭弹窗（回树）",
+    objsTextHas("无前置，可直接实施").length === 0 && objsTextHas("方舱医院").length > 0, anyPanel() ? "panel" : "closed");
+clickAt(246, 316); snap(); // 重新打开方舱医院对话框
 clickAt(960, 724); snap(); // 「实施」圆角按钮 -> 获取 + 关闭对话框
 ok("t90 实施按钮：点「实施」获取方舱医院（对话框关闭，回树；树上无原因文本）",
     objsTextHas("无前置，可直接实施").length === 0 && objsTextHas("实施").length === 0,

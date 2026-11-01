@@ -311,6 +311,7 @@ fun renderBlocksRows(m: Json, i: Nat, n: Nat, off: Nat): Null =
     }
 @impure
 fun policyPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
+    if (engNum(s, F_PSEL()) > 0) { return s } else null
     var ent: Json = modEnt(m)
     var n: Nat = policyCount(ent)
     var off: Nat = engNum(s, F_SCROLL())
@@ -456,6 +457,7 @@ fun renderOpsPageRows(m: Json, s: Str, pid: Nat, pg: Json, i: Nat, n: Nat): Null
 // ---------- 操作界面点击分派（全屏行带） ----------
 @impure
 fun opsPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
+    if (engNum(s, F_PSEL()) > 0) { return s } else null
     var ent: Json = modEnt(m)
     var ops: Json = chapterOps(ent, engNum(s, F_CHAP()))
     if (!rowInRowX(mx)) { return s } else null
