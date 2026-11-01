@@ -147,7 +147,10 @@
   {
    "id": "policy.fangcang",
    "name": "方舱医院",
-   "requires": [],
+   "prereq": {
+    "mode": "all",
+    "list": []
+   },
    "effects": [
     {
      "op": "res",
@@ -159,7 +162,10 @@
   {
    "id": "policy.healthcode",
    "name": "健康码体系",
-   "requires": [],
+   "prereq": {
+    "mode": "all",
+    "list": []
+   },
    "effects": [
     {
      "op": "res",
@@ -174,16 +180,32 @@
    ]
   },
   {
-   "id": "policy.rework",
-   "name": "复工指导手册",
-   "requires": [
-    "policy.fangcang"
-   ],
+   "id": "policy.lockdown",
+   "name": "严格封控",
+   "prereq": {
+    "mode": "all",
+    "list": []
+   },
    "effects": [
     {
      "op": "res",
+     "v": "res.danger",
+     "n": -12
+    },
+    {
+     "op": "res",
      "v": "res.economy",
-     "n": 4
+     "n": -6
+    },
+    {
+     "op": "res",
+     "v": "res.fatigue",
+     "n": 6
+    },
+    {
+     "op": "res",
+     "v": "res.support",
+     "n": -3
     }
    ]
   },
@@ -226,6 +248,113 @@
      "op": "res",
      "v": "res.economy",
      "n": 6
+    }
+   ]
+  },
+  {
+   "id": "policy.epi",
+   "name": "流调溯源队伍",
+   "prereq": {
+    "mode": "any",
+    "list": [
+     "policy.healthcode",
+     "policy.lockdown"
+    ]
+   },
+   "effects": [
+    {
+     "op": "res",
+     "v": "res.stability",
+     "n": 4
+    },
+    {
+     "op": "res",
+     "v": "res.tech",
+     "n": 4
+    }
+   ]
+  },
+  {
+   "id": "policy.rework",
+   "name": "复工指导手册",
+   "prereq": {
+    "mode": "all",
+    "list": [
+     "policy.epi"
+    ]
+   },
+   "effects": [
+    {
+     "op": "res",
+     "v": "res.economy",
+     "n": 4
+    }
+   ]
+  },
+  {
+   "id": "policy.vaccine",
+   "name": "疫苗研发冲刺",
+   "prereq": {
+    "mode": "any",
+    "list": [
+     "policy.detection",
+     "policy.epi"
+    ]
+   },
+   "mutex": [
+    "policy.herd"
+   ],
+   "effects": [
+    {
+     "op": "res",
+     "v": "res.medical",
+     "n": 12
+    },
+    {
+     "op": "res",
+     "v": "res.tech",
+     "n": 6
+    },
+    {
+     "op": "res",
+     "v": "res.support",
+     "n": 4
+    }
+   ]
+  },
+  {
+   "id": "policy.herd",
+   "name": "群体免疫路线",
+   "prereq": {
+    "mode": "any",
+    "list": [
+     "policy.austerity",
+     "policy.lockdown"
+    ]
+   },
+   "mutex": [
+    "policy.vaccine"
+   ],
+   "effects": [
+    {
+     "op": "res",
+     "v": "res.economy",
+     "n": 8
+    },
+    {
+     "op": "res",
+     "v": "res.support",
+     "n": -8
+    },
+    {
+     "op": "res",
+     "v": "res.stability",
+     "n": -6
+    },
+    {
+     "op": "res",
+     "v": "res.danger",
+     "n": 10
     }
    ]
   }

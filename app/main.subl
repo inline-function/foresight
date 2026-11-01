@@ -315,6 +315,10 @@ fun runSmoke(): Null {
     var l2: Null = spriteLoad("ic-rework", "assets/img/ic-rework.png")
     var l3: Null = spriteLoad("ic-detection", "assets/img/ic-detection.png")
     var l4: Null = spriteLoad("ic-austerity", "assets/img/ic-austerity.png")
+    var l5: Null = spriteLoad("ic-lockdown", "assets/img/ic-lockdown.png")
+    var l6: Null = spriteLoad("ic-epi", "assets/img/ic-epi.png")
+    var l7: Null = spriteLoad("ic-vaccine", "assets/img/ic-vaccine.png")
+    var l8: Null = spriteLoad("ic-herd", "assets/img/ic-herd.png")
     var au0: Bool = bgmPlayId(BGM_MAIN())
     onScroll { dy =>
         var pn: Str = engField(st, F_PANEL())

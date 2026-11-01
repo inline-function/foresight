@@ -157,9 +157,9 @@ fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
     }
 // 国策图标（TFR 素材）：方舱医院=疫苗研发、健康码体系=数字化、复工指导=地方复苏、
 // 扩大核酸检测=大规模检测、紧缩节流=暂停消费经济；宽高各异用 fit 统一适配图标区
-fun policyIconName(i: Nat): Str = if (i == 0) "ic-fangcang" else (if (i == 1) "ic-healthcode" else (if (i == 2) "ic-rework" else (if (i == 3) "ic-detection" else (if (i == 4) "ic-austerity" else ""))))
-fun policyIconW(i: Nat): Rat = if (i == 0) 164.0 else (if (i == 1) 162.0 else (if (i == 2) 185.0 else (if (i == 3) 140.0 else 194.0)))
-fun policyIconH(i: Nat): Rat = if (i == 0) 140.0 else (if (i == 1) 150.0 else (if (i == 2) 120.0 else (if (i == 3) 140.0 else 150.0)))
+fun policyIconName(i: Nat): Str = if (i == 0) "ic-fangcang" else (if (i == 1) "ic-healthcode" else (if (i == 2) "ic-lockdown" else (if (i == 3) "ic-detection" else (if (i == 4) "ic-austerity" else (if (i == 5) "ic-epi" else (if (i == 6) "ic-rework" else (if (i == 7) "ic-vaccine" else (if (i == 8) "ic-herd" else ""))))))))
+fun policyIconW(i: Nat): Rat = if (i == 0) 164.0 else (if (i == 1) 162.0 else (if (i == 2) 172.0 else (if (i == 3) 140.0 else (if (i == 4) 194.0 else (if (i == 5) 217.0 else (if (i == 6) 185.0 else (if (i == 7) 164.0 else 164.0)))))))
+fun policyIconH(i: Nat): Rat = if (i == 0) 140.0 else (if (i == 1) 150.0 else (if (i == 2) 140.0 else (if (i == 3) 140.0 else (if (i == 4) 150.0 else (if (i == 5) 150.0 else (if (i == 6) 120.0 else (if (i == 7) 140.0 else 150.0)))))))
 fun policyIconFit(i: Nat): Rat = if ((120.0 / policyIconW(i)) < (120.0 / policyIconH(i))) (120.0 / policyIconW(i)) else (120.0 / policyIconH(i))
 // ---------- 国策树布局（HOI4 式：前置深度分层，同列按序竖排） ----------
 fun TREE_X0(): Rat = 96.0
