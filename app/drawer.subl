@@ -99,10 +99,14 @@ fun isSeaName(name: Str): Bool {
 fun buildDrawer(m: Json, st: Str): List[(Any, Rat, Rat)] {
     var dr: Str = engField(st, F_DRAWER())
     var nm: Str = drawerNameOf(dr)
+    var sea: Bool = isSeaName(nm)  // 海域=特殊地块：无稳定度/人口/发展程度，无驻军，军队不通过
     var move: Bool = false
     var ent: Json = modEnt(m)
     var rg: Json = regionOf(jk(ent, "blocks"), nm)
-    var trps: Rat = troopOf(engField(st, F_TROOPS()), nm, jnum(rg, "troops"))
+    var trps: Rat = if (sea) 0.0 else troopOf(engField(st, F_TROOPS()), nm, jnum(rg, "troops"))
+    var tagY: Rat = if (sea) 240.0 else 476.0
+    var tagLineY: Rat = if (sea) 216.0 else 452.0
+    var tagChipsY: Rat = if (sea) 276.0 else 512.0
     @mut var p: List[(Any, Rat, Rat)] = emptyList()
     p = cons((addRoundRect(DR_W(), 1080.0, 0.0, 0.0, DR_CARD(), "drawer", DR_Z(), 24.0), 0.0, 0.0), p)
     p = cons((addRoundRect(72.0, 72.0, 520.0, 24.0, DR_LINE(), "drawer", DR_Z(), 20.0), 520.0, 24.0), p)
@@ -110,16 +114,20 @@ fun buildDrawer(m: Json, st: Str): List[(Any, Rat, Rat)] {
     p = cons((addTextT(nm, 40.0, 84.0, 42.0, 700, DR_TXT(), "drawer", true, DR_Z()), 40.0, 84.0), p)
     p = cons((addTextT(concat("归属 ", ownerNameOf(ent, rg)), 40.0, 148.0, 26.0, 400, DR_SUB(), "drawer", true, DR_Z()), 40.0, 148.0), p)
     p = cons((addRectT(548.0, 2.0, 36.0, 196.0, DR_LINE(), "drawer", DR_Z()), 36.0, 196.0), p)
-    // 属性
-    p = drAttr(p, 224.0, "人口", concat(drNum(jnum(rg, "pop")), " 万"))
-    p = drAttr(p, 300.0, "稳定度", concat(drNum(jnum(rg, "stab")), " / 100"))
-    p = drAttr(p, 376.0, "发展程度", concat(drNum(jnum(rg, "dev")), " / 10"))
-    p = cons((addRectT(548.0, 2.0, 36.0, 452.0, DR_LINE(), "drawer", DR_Z()), 36.0, 452.0), p)
-    p = cons((addTextT("标签", 40.0, 476.0, 22.0, 600, DR_SUB(), "drawer", true, DR_Z()), 40.0, 476.0), p)
-    p = drTags(p, jk(rg, "tags"), 0, arrLen(jk(rg, "tags")), 40.0, 512.0)
-    p = cons((addRectT(548.0, 2.0, 36.0, 640.0, DR_LINE(), "drawer", DR_Z()), 36.0, 640.0), p)
-
-
+    // 属性（海域无）
+    if (sea) null else {
+        p = drAttr(p, 224.0, "人口", concat(drNum(jnum(rg, "pop")), " 万"))
+        p = drAttr(p, 300.0, "稳定度", concat(drNum(jnum(rg, "stab")), " / 100"))
+        p = drAttr(p, 376.0, "发展程度", concat(drNum(jnum(rg, "dev")), " / 10"))
+        p = cons((addRectT(548.0, 2.0, 36.0, 452.0, DR_LINE(), "drawer", DR_Z()), 36.0, 452.0), p)
+    }
+    // 标签（海域保留，块上移）
+    p = cons((addRectT(548.0, 2.0, 36.0, tagLineY, DR_LINE(), "drawer", DR_Z()), 36.0, tagLineY), p)
+    p = cons((addTextT("标签", 40.0, tagY, 22.0, 600, DR_SUB(), "drawer", true, DR_Z()), 40.0, tagY), p)
+    p = drTags(p, jk(rg, "tags"), 0, arrLen(jk(rg, "tags")), 40.0, tagChipsY)
+    // 驻军（海域无军队数量）
+    if (sea) null else {
+        p = cons((addRectT(548.0, 2.0, 36.0, 640.0, DR_LINE(), "drawer", DR_Z()), 36.0, 640.0), p)
         p = cons((addTextT("驻扎军队", 40.0, 664.0, 22.0, 600, DR_SUB(), "drawer", true, DR_Z()), 40.0, 664.0), p)
         p = cons((addTextT(drNum(trps), 40.0, 700.0, 46.0, 700, DR_TXT(), "drawer", true, DR_Z()), 40.0, 700.0), p)
         if (trps > 0.0) {
@@ -129,6 +137,7 @@ fun buildDrawer(m: Json, st: Str): List[(Any, Rat, Rat)] {
             p = cons((addRoundRect(260.0, 64.0, 320.0, 704.0, DR_LINE(), "drawer", DR_Z(), 20.0), 320.0, 704.0), p)
             p = cons((addTextT("无可移动军队", 371.0, 722.0, 22.0, 400, DR_SUB(), "drawer", true, DR_Z()), 371.0, 727.5), p)
         }
+    }
 
     return p
 }
@@ -161,7 +170,7 @@ fun drShift(pairs: List[(Any, Rat, Rat)], off: Rat): Null =
 fun drawerHit(m: Json, st: Str, mx: Rat, my: Rat): Str {
     var dr: Str = engField(st, F_DRAWER())
     var nm: Str = drawerNameOf(dr)
-    var trps: Rat = troopOf(engField(st, F_TROOPS()), nm, troopDefault(modEnt(m), nm))
+    var trps: Rat = if (isSeaName(nm)) 0.0 else troopOf(engField(st, F_TROOPS()), nm, troopDefault(modEnt(m), nm))
     if (strCmp(dr, "none") == 0) { return st } else null
     if ((mx >= 520.0) && (mx < 592.0) && (my >= 24.0) && (my < 96.0)) { return drawerClose(st) } else {
         if ((trps > 0.0) && (mx >= 320.0) && (mx < 580.0) && (my >= 704.0) && (my < 768.0)) {

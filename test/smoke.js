@@ -385,9 +385,12 @@ ok("t90 军队不渡海：移动模式点邻接海域（渤海）不移动，高
     drawerOn() && objsTextHas("渤海").length > 0 && objsTextHas("移动军队：点击高亮地块").length === 0, "movetarget=" + movetargetSea + " drawerN=" + __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length + " sea=" + JSON.stringify(oneText("渤海")) + " phase=" + oneText("移动军队"));
 clickAt(560, 60); sgFrames(8); snap(); // 关闭渤海抽屉
 clickAt(1501, 665); snap(); // 东海（世界 1540,640；陆地点之外的海域）
-ok("t89 海域抽屉：东海 / 归属公海 / 标签海域 / 舰队可移动",
+ok("t90 海域特殊地块：东海 / 归属公海 / 标签海域；无稳定度/人口/发展程度，无驻扎军队",
     objsWithText("东海").length > 0 && objsTextHas("公海").length > 0
-    && objsTextHas("海域").length > 0 && objsTextHas("移动军队").length > 0,
+    && objsTextHas("海域").length > 0
+    && objsTextHas("稳定度").length === 0 && objsTextHas("人口").length === 0
+    && objsTextHas("发展程度").length === 0 && objsTextHas("驻扎军队").length === 0
+    && objsTextHas("移动军队").length === 0 && objsTextHas("无可移动军队").length === 0,
     oneText("公海"));
 clickAt(560, 60); sgFrames(8); snap(); // 关闭海域抽屉（动画收回）
 navBtn(0);
