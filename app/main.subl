@@ -486,13 +486,13 @@ onUpdate { dt =>
                                     if (startsWith(dr0, "m:")) {
                                         var src: Str = drawerNameOf(dr0)
                                         var nbs: List[Str] = adjNames(src)
-                                        if ((strCmp(nm, "") != 0) && (strCmp(nm, src) != 0) && nameInList(nbs, 0, size(nbs), nm)) {
+                                        if ((strCmp(nm, "") != 0) && (strCmp(nm, src) != 0) && nameInList(nbs, 0, size(nbs), nm) && (!isSeaName(nm))) {
                                             st = drawerMoveOne(m, st, src, nm)
                                             drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0; st = engSet(st, F_DRAWER(), "none")
                                             objTextSet(label, "")
-                                        } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else null }
+                                        } else { if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm); objTextSet(label, "") } else null }
                                     } else {
-                                        if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm) } else null
+                                        if (strCmp(nm, "") != 0) { st = engSet(st, F_DRAWER(), nm); objTextSet(label, "") } else null
                                     }
                                     var dr1: Str = engField(st, F_DRAWER())
                                     if (startsWith(dr1, "m:")) {

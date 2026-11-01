@@ -342,9 +342,9 @@ clickAt(1233, 379); snap(); // 重新打开北京市抽屉
 clickAt(1233, 379); snap(); // 拦截后重新打开北京市抽屉
 ok("t89 抽屉驻军：数量 3 + 移动军队按钮", objsTextHas("移动军队").length > 0);
 clickAt(440, 736); snap(); // 移动军队按钮 -> 进入移动模式（抽屉关闭、地图高亮邻接地）
-ok("t89 移动模式：抽屉关闭 + 地图高亮邻近地块(>=3) + 提示语",
+ok("t89 移动模式：抽屉关闭 + 地图高亮邻近陆地(>=2，海域不亮) + 提示语",
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
-    && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3
+    && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 2
     && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0, oneText("移动军队："));
 clickAt(1251, 393); snap(); // 高亮的天津市形心 -> 移动 1 支军队 -> 抽屉收回 + 解除高亮
 ok("t89 驻军移动：移动后抽屉收回、高亮解除（无抽屉/movetarget=0/无已选标签）",
@@ -353,8 +353,8 @@ clickAt(1233, 379); snap(); // 重开北京市抽屉验兵力
 ok("t89 驻军移动：北京驻军 3 -> 2（抽屉重开、移动军队按钮仍可用）",
     objsTextHas("驻扎军队").length > 0 && objsTextHas("移动军队").length > 0);
 clickAt(440, 736); snap(); // 再次进入移动模式
-ok("t89 移动模式重入：高亮邻接地 >= 3 + 提示语",
-    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 3 && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0);
+ok("t89 移动模式重入：高亮陆地邻接 >= 2 + 提示语（海域不渡）",
+    __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 2 && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0);
 clickAt(1233, 379); snap(); // 点非邻接地（北京自身）-> 退出移动模式、抽屉重开
 ok("t89 退出移动模式：点非邻接地 -> 高亮清除、抽屉重开",
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0 && objsTextHas("驻扎军队").length > 0);
@@ -362,6 +362,14 @@ clickAt(560, 60); sgFrames(8); snap(); // 关闭 ✕ (520..592, 24..96)
 var drObjs = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; });
 ok("t89 抽屉关闭：drawer 层清空 + 取消地块高亮（无「已选」标签、无移动模式）",
     drObjs.length === 0 && objsTextHas("已选：").length === 0 && __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length === 0, "drawer=" + drObjs.length);
+// ---- t90 军队不渡海：移动模式下点邻接海域 -> 不移动，改为开该海域抽屉 ----
+clickAt(1233, 379); snap(); // 重开北京市抽屉
+clickAt(440, 736); snap(); // 移动军队按钮 -> 移动模式
+var movetargetSea = __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length;
+clickAt(1338, 412); snap(); // 渤海形心（北京市邻接海域）：不渡海 -> 开渤海抽屉、非移动
+ok("t90 军队不渡海：移动模式点邻接海域（渤海）不移动，高亮仅陆地（movetarget 无海域），改开海域抽屉",
+    drawerOn() && objsTextHas("渤海").length > 0 && objsTextHas("移动军队：点击高亮地块").length === 0, "movetarget=" + movetargetSea + " drawerN=" + __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length + " sea=" + JSON.stringify(oneText("渤海")) + " phase=" + oneText("移动军队"));
+clickAt(560, 60); sgFrames(8); snap(); // 关闭渤海抽屉
 clickAt(1501, 665); snap(); // 东海（世界 1540,640；陆地点之外的海域）
 ok("t89 海域抽屉：东海 / 归属公海 / 标签海域 / 舰队可移动",
     objsWithText("东海").length > 0 && objsTextHas("公海").length > 0

@@ -86,6 +86,14 @@ fun adjRow(rows: List[Str], i: Nat, n: Nat, name: Str): List[Str] =
         else adjRow(rows, (i + 1), n, name)
     }
 
+// ---------- 海域名（与 east-data SEAS 一致）：军队不渡海，移动目标限陆地省 ----------
+fun SEA_NAMES(): Str = "渤海|黄海|东海|南海|北部湾|泰国湾|对马海峡|日本海|鄂霍次克海|菲律宾海|北太平洋|印度洋|南太平洋|台湾海峡"
+@impure
+fun isSeaName(name: Str): Bool {
+    var seas: List[Str] = strSplit(SEA_NAMES(), "|")
+    return nameInList(seas, 0, size(seas), name)
+}
+
 // ---------- 抽屉构建（返回 (对象, 基x, 基y) 列表供滑入动画） ----------
 @impure
 fun buildDrawer(m: Json, st: Str): List[(Any, Rat, Rat)] {
@@ -169,6 +177,7 @@ fun drawerMoveOne(m: Json, st: Str, from: Str, to: Str): Str {
     var trps: Rat = troopOf(ts, from, troopDefault(modEnt(m), from))
     var td: Rat = troopOf(ts, to, troopDefault(modEnt(m), to))
     if (trps <= 0.0) { return st } else null
+    if (isSeaName(to)) { return st } else null
     var t2: Str = troopSet(ts, from, (trps - 1.0))
     var t3: Str = troopSet(t2, to, (td + 1.0))
     var s2: Str = engSet(st, F_TROOPS(), t3)
@@ -187,7 +196,8 @@ fun drawMoveHi(geo: Any, n: Nat, geoSea: Any, nSea: Nat, src: Str): Null {
 fun moveHiLoop(geo: Any, n: Nat, i: Nat, nbs: List[Str]): Null =
     if (i >= n) null
     else {
-        if (nameInList(nbs, 0, size(nbs), mapProvName(geo, i))) {
+        var pn: Str = mapProvName(geo, i)
+        if ((nameInList(nbs, 0, size(nbs), pn)) && (!isSeaName(pn))) {
             var o: Any = mapProvObj(geo, i, MOVE_HI())
             objTag(o, "movetarget")
         } else null
