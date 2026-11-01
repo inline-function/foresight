@@ -500,8 +500,26 @@ var b1 = sv.call("bgmPlay", [""]);
 var b2 = sv.call("bgmPlay", ["no-such-file.mp3"]);
 var b3 = sv.call("bgmStop", []);
 ok("音乐接入点：空名/缺失资产 bgmPlay 静默 false，bgmStop 无异常", b1 === false && b2 === false && b3 === true, JSON.stringify([b1, b2, b3]));
+// ---- 音频/图标接入（t90）：sndPlay op + 资产落包 ----
+var s1 = sv.call("sndPlay", [""]);
+var s2 = sv.call("sndPlay", ["no-such-file.wav"]);
+ok("音效 op：空名/缺失资产 sndPlay 静默 false（Node 无 Audio）", s1 === false && s2 === false, JSON.stringify([s1, s2]));
+var auDir = path.join(gameDir, "assets", "audio");
+var sfxIds = ["click", "close", "start", "news"];
+var bgmIds = ["main", "prologue", "ch1-open", "end-excellent", "end-pass", "end-fail", "end-collapse"];
+var missFx = sfxIds.filter(function (id) { return !fse.existsSync(path.join(auDir, "sfx-" + id + ".wav")); });
+var missBgm = bgmIds.filter(function (id) { return !fse.existsSync(path.join(auDir, "bgm-" + id + ".wav")); });
+ok("资产落包：sfx-*/bgm-*（11 份 wav）随 build/game/assets", missFx.length === 0 && missBgm.length === 0, missFx.concat(missBgm).join(",") || "all");
+var modBgmIds = ev.filter(function (e) { return e.kind === "super" && e.bgm; }).map(function (e) { return e.bgm; });
+var uniqIds = modBgmIds.filter(function (v, k) { return modBgmIds.indexOf(v) === k; });
+var missEv = uniqIds.filter(function (id) { return !fse.existsSync(path.join(auDir, id + ".wav")); });
+ok("BGM 映射：超事件 bgm id 与 assets/audio/<id>.wav 同名同在（fail_a/fail_b 共用 end-fail，去重 5 档）", missEv.length === 0 && uniqIds.length >= 5, (missEv.join(",") || "all") + " ids=" + uniqIds.length);
+var icDir = path.join(gameDir, "assets", "img");
+var icns = ["ic-fangcang", "ic-healthcode", "ic-rework"];
+var missIc = icns.filter(function (id) { return !fse.existsSync(path.join(icDir, id + ".png")); });
+ok("图标落包：assets/img/ic-*.png（3 张国策图标）", missIc.length === 0, missIc.join(",") || "all");
 
-if (fails === 0) console.log("SMOKE: ALL PASSED（t89 MD3+2x：1920x1080 画布/顶栏 chips/底栏导航图标/全屏界面+返回键/MD3 卡与圆角/地图几何 x2/状态层 + lieyan 全流程回归）");
+if (fails === 0) console.log("SMOKE: ALL PASSED（t89 MD3+2x：1920x1080 画布/顶栏 chips/底栏导航图标/全屏界面+返回键/MD3 卡与圆角/地图几何 x2/状态层 + 音频图标接入 + lieyan 全流程回归）");
 else console.log("SMOKE: FAILED " + fails + " 项");
 process.exit(fails === 0 ? 0 : 1);
 }

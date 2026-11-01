@@ -1,0 +1,32 @@
+// audio.subl —— 音频桥（BGM 单通道循环 + 一次性音效；资产缺失静默）
+//
+// 资产约定（assets/ 由 build.ps1 随包）：
+//   bgm —— assets/audio/<bgm id>.wav：与模组 entities.events 中 kind=super 的 bgm 字段同名，
+//          bgm-main 为正常进行曲；超事件 bgm 接管，事件阶段结束后回到 bgm-main
+//   sfx —— assets/audio/sfx-<id>.wav：click / close / start / news
+// Audio 环境缺失（Node smoke）/浏览器手势策略拦截自动播放时一律静默 false，不阻断游戏流；
+// 运行时同名 BGM 去重（播放失败会置未播放，下一帧自动重试），故可逐帧调用。
+
+// ---------- 宿主桥（@game op，无体声明） ----------
+@game @host @impure fun bgmMount(name: Str): Bool
+@game @host @impure fun bgmPlay(name: Str): Bool
+@game @host @impure fun bgmStop(): Bool
+@game @host @impure fun sndPlay(name: Str): Bool
+
+// ---------- 曲目/音效表 ----------
+fun BGM_MAIN(): Str = "bgm-main"
+fun sfxFile(id: Str): Str = concat("assets/audio/sfx-", concat(id, ".wav"))
+fun bgmFile(id: Str): Str = concat("assets/audio/", concat(id, ".wav"))
+
+// 按 bgm id 播放（同曲逐帧调用安全；失败静默）。
+@impure
+fun bgmPlayId(id: Str): Bool {
+    var f: Str = bgmFile(id)
+    return if (strCmp(f, "") == 0) bgmStop() else bgmPlay(f)
+}
+
+// 按 sfx id 播一次性音效（click/close/start/news）
+@impure
+fun sfxPlay(id: Str): Bool {
+    return sndPlay(sfxFile(id))
+}

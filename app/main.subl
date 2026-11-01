@@ -134,6 +134,18 @@ fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, hex: Str, tag: Str, fixe
     unchecked objTag(o, tag)
     return o
 }
+// 精灵图标（fixed + z；sc 按图标原始像素折算）
+@impure
+fun addIconT(name: Str, x: Rat, y: Rat, sc: Rat, tag: Str, z: Rat): Null {
+    unchecked var o = objAdd()
+    unchecked objUse(o, compPos(x, y))
+    unchecked objUse(o, compSprite(name))
+    unchecked objUse(o, compScale(sc))
+    unchecked objUse(o, compFixed())
+    unchecked objUse(o, compZ(z))
+    unchecked objTag(o, tag)
+    null
+}
 // 折行文本（width>0 触发 KAPLAY 原生折行；CJK 图集分桶 + 线性过滤保证锐利）
 @impure
 fun addTextWrap(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, width: Rat, hex: Str, tag: Str, fixed: Bool, z: Rat): Any {
@@ -273,6 +285,7 @@ fun runSmoke(): Null {
     @mut var drPairs: List[(Any, Rat, Rat)] = emptyList()
     @mut var autoOn: Bool = false
     @mut var autoAcc: Rat = 0.0
+    @mut var startSfx: Bool = false
     @mut var st: Str = engInit(md, ent)
     buildTopbar(m, st)
     var label: Any = addTextC("", 960.0, LABEL_Y(), 26.0, COL_SUB(), "ui", true, 22.0)
@@ -295,6 +308,11 @@ fun runSmoke(): Null {
     // 引擎起步：tick 1（相位1 日期推进+资源产出 -> 相位2 玩家操作；队长裁决：进游戏先看地图，
     // 操作/国策/属性/地块界面由底栏按钮切全屏打开）
     st = engTickStart(m, st)
+    // 音频/图标资产预载（TFR 素材；缺失静默）：国策图标 + 主线 BGM
+    var l0: Null = spriteLoad("ic-fangcang", "assets/img/ic-fangcang.png")
+    var l1: Null = spriteLoad("ic-healthcode", "assets/img/ic-healthcode.png")
+    var l2: Null = spriteLoad("ic-rework", "assets/img/ic-rework.png")
+    var au0: Bool = bgmPlayId(BGM_MAIN())
     onScroll { dy =>
         var pn: Str = engField(st, F_PANEL())
         var ph: Str = engField(st, F_PHASE())
@@ -333,6 +351,8 @@ fun runSmoke(): Null {
         }
     }
 onUpdate { dt =>
+    // 非事件阶段回到主线 BGM（同名去重；首播被手势拦截则逐帧重试）
+    var bm: Bool = if (strCmp(engField(st, F_PHASE()), "events") == 0) false else bgmPlayId(BGM_MAIN())
     if (drClosing) {
         var nx: Rat = (drX - (DR_SPEED() * dt))
         if (nx <= DR_OFF_X()) { drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0 } else { drX = nx; drShift(drPairs, nx) }
@@ -355,11 +375,15 @@ onUpdate { dt =>
         pressY = mousePosY()
         lastX = pressX
         lastY = pressY
-        // MD3 状态层：按下底栏按钮即闪覆盖色
+        // 首次手势解锁音频（浏览器自动播放策略）：开场音；之后底栏按钮按下 click
+        var s0: Bool = if (startSfx) false else sfxPlay("start")
         var b0: Nat = whichBtn(pressX, pressY)
         if (b0 < BTN_N()) {
+            // MD3 状态层：按下底栏按钮即闪覆盖色
+            var s2: Bool = if (startSfx) sfxPlay("click") else false
             var fl: Any = addRectT(NAV_W(), NAV_H(), btnX(b0), NAV_Y(), "#444B52", "statelayer", 40.0)
         } else null
+        if (startSfx) null else { startSfx = true }
     } }
     onMouseMove { _m => if (pressed) {
         var mx: Rat = mousePosX()
@@ -386,12 +410,14 @@ onUpdate { dt =>
                     if (pressX < DR_W()) {
                         if ((pressX >= 520.0) && (pressX < 592.0) && (pressY >= 24.0) && (pressY < 96.0)) {
                             drClosing = true
+                            var sc: Bool = sfxPlay("close")
                             st = engSet(st, F_DRAWER(), "none")
                             objsDestroyTag("block")
                             sel = -1
                             renderBlocks(geo, n, -1)
                             objTextSet(label, "")
                         } else {
+                        var sd: Bool = sfxPlay("click")
                         var s2: Str = drawerHit(m, st, pressX, pressY)
                         var d2: Str = engField(s2, F_DRAWER())
                         st = if (strCmp(d2, "pass") == 0) st else s2
@@ -416,6 +442,7 @@ onUpdate { dt =>
                         && (pressX >= AUTO_X()) && (pressX < (AUTO_X() + AUTO_S()))
                         && (pressY >= AUTO_Y()) && (pressY < (AUTO_Y() + AUTO_S()))) {
                         autoOn = !autoOn
+                        var sa: Bool = sfxPlay("click")
                     consumed = true
                         autoAcc = 0.0
                         drawAutoBtn(autoOn)
@@ -425,18 +452,22 @@ onUpdate { dt =>
                     if (strCmp(engField(st, F_DRAWER()), "none") != 0) { objsDestroyTag("block"); sel = -1; renderBlocks(geo, n, -1); objTextSet(label, ""); drClosing = false; objsDestroyTag("drawer"); drPairs = emptyList(); drX = 0.0; st = engSet(st, F_DRAWER(), "none") } else null
                         var kind: Str = btnKind(b)
                         if (strCmp(kind, engField(st, F_PANEL())) == 0) {
+                            var sz: Bool = sfxPlay("close")
                             objsDestroyTag("panel")
                             st = engSet(st, F_PANEL(), "none")
                         } else {
+                            var so: Bool = sfxPlay("click")
                             if (strCmp(kind, "ops") == 0) { st = engOpsOpen(m, st) }
                             else { st = renderPanelKind(m, st, kind) }
                         }
                     } else {
                         if ((strCmp(engField(st, F_PANEL()), "none") != 0) && panelBackHit(pressX, pressY)) {
+                            var sb: Bool = sfxPlay("close")
                             objsDestroyTag("panel")
                             st = engSet(st, F_PANEL(), "none")
                         } else {
                             var pn: Str = engField(st, F_PANEL())
+                            var sr: Bool = if (strCmp(pn, "none") != 0) sfxPlay("click") else false
                             if (strCmp(pn, "ops") == 0) { st = opsPanelHit(m, st, pressX, pressY) }
                             else {
                                 if (strCmp(pn, "policy") == 0) { st = policyPanelHit(m, st, pressX, pressY) }

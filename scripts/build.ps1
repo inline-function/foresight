@@ -54,6 +54,10 @@ Copy-Item (Join-Path $R "js\*")       (Join-Path $OutDir "js") -Recurse -Force
 Copy-Item (Join-Path $R "vendor\kaplay.js") (Join-Path $OutDir "vendor") -Force
 Copy-Item (Join-Path $R "vendor\README.md") (Join-Path $OutDir "vendor") -Force
 Copy-Item (Join-Path $R "vendor\fonts\*")  (Join-Path $OutDir "vendor\fonts") -Force
+# 音频与图标资产（TFR 素材：bgm/sfx/img）随包复制到 build/game/assets
+New-Item -ItemType Directory -Force -Path (Join-Path $OutDir "assets") | Out-Null
+if (Test-Path (Join-Path $R "assets")) { Copy-Item (Join-Path $R "assets\*") (Join-Path $OutDir "assets") -Recurse -Force }
+
 # 模组源一并随包（数据本体在构建期已烘焙进 app.js；mods/ 保留源布局供阅读/扩展）
 New-Item -ItemType Directory -Force -Path (Join-Path $OutDir "mods") | Out-Null
 Copy-Item (Join-Path $R "mods\*") (Join-Path $OutDir "mods") -Recurse -Force

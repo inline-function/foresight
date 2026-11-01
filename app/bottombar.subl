@@ -155,6 +155,9 @@ fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
         var sub: Any = addTextT(concat("产出 ", concat(toStr(p), "/天")), (ROW_X() + 32.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
         renderAttrRows(m, s, (i + 1), n, off)
     }
+// 政策行图标（TFR 素材：方舱医院=疫苗研发、健康码体系=数字化、复工指导=地方复苏）
+fun policyIconName(i: Nat): Str = if (i == 0) "ic-fangcang" else (if (i == 1) "ic-healthcode" else (if (i == 2) "ic-rework" else ""))
+fun policyIconScale(i: Nat): Rat = if (i == 0) 0.5 else (if (i == 1) 0.48 else (if (i == 2) 0.42 else 1.0))
 @impure
 fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
     if ((i >= n) || ((rowYOf(i, off) + ROW_H()) > NAV_Y())) null
@@ -164,8 +167,10 @@ fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
         var mark: Str = if (acq) "已行" else (if (policyCanAcquire(ent, s, i)) "可解" else "锁定")
         var nm: Str = jstr(policyRow(ent, i), "name")
         var row: Any = fsRow(i, off, acq)
-        var mt: Any = addTextT(concat(concat(mark, " "), nm), (ROW_X() + 32.0), (rowYOf(i, off) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
-        var st: Any = addTextT(policyReqText(ent, i), (ROW_X() + 32.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
+        var icn: Str = policyIconName(i)
+        if (strCmp(icn, "") != 0) { addIconT(icn, (ROW_X() + 16.0), (rowYOf(i, off) + 9.0), policyIconScale(i), "panel", 32.0) } else null
+        var mt: Any = addTextT(concat(concat(mark, " "), nm), (ROW_X() + 124.0), (rowYOf(i, off) + 14.0), 28.0, 600, TXT_HEX(), "panel", true, 32.0)
+        var st: Any = addTextT(policyReqText(ent, i), (ROW_X() + 124.0), (rowYOf(i, off) + 54.0), 20.0, 400, TXT_VAR(), "panel", true, 32.0)
         renderPolicyRows(m, s, (i + 1), n, off)
     }
 @impure

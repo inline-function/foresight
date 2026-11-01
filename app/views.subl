@@ -4,7 +4,11 @@
 // 三种层的内容全部来自模组 entities.events，本体只提供几何与缺图占位渲染。
 // tag="view"（z 26-100）：事件层高于全屏界面(30)，超事件全屏高于一切。
 @impure
-fun bgmHookOf(name: Str): Null = null
+fun bgmHookOf(name: Str): Null {
+    // 按 bgm id 播放/停止（bgmPlayId 内部同曲去重，逐帧调用安全）
+    var u: Bool = if (strCmp(name, "") == 0) bgmStop() else bgmPlayId(name)
+    null
+}
 
 // ---------- 演出层几何（x2） ----------
 fun CC_X(): Rat = 480.0
@@ -146,6 +150,8 @@ fun lineHint(step: Nat, cnt: Nat): Str =
 @impure
 fun renderSuper(m: Json, ev: Json, step: Nat): Null {
     bgmHookOf(jstr(ev, "bgm"))
+    // 超事件入场播一次 world_news 提示音
+    var fx: Bool = if (step == 0) sfxPlay("news") else false
     var bk: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_BLACK(), "view", 100.0)
     var tt: Any = addTextC(jstr(ev, "title"), 960.0, 300.0, 44.0, COL_SOFT(), "view", true, 100.0)
     var lt: Any = addTextC(lineTextOf(jk(ev, "lines"), step), 960.0, 480.0, 46.0, COL_SOFT(), "view", true, 100.0)

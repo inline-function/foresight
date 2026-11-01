@@ -121,6 +121,8 @@ class CDP {
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-open2.png", [1233, 379]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-auto.png", [1636, 44]);
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-closed.png", [560, 60]);
+// 政策面板：底栏第 2 个按钮（国策），验证 ic-* 图标渲染
+await shot("F:\\SublimationProject\\foresight\\test\\shot-panel-policy.png", [720, 1044]);
   edge.kill();
   process.exit(0);
 })().catch(e => { console.log("ERR", e.message.slice(0, 200)); process.exit(1); });

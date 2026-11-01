@@ -490,6 +490,7 @@ function saveDrop(name) {
 // 绝不因缺音乐打断叙事流（架构决策：资产缺失静默不报错）。
 var __sgBgmEl = null;
 var __sgBgmName = "";
+var __sgBgmPlaying = false;
 function bgmMount(name) {
     __sgBgmEl = null;
     __sgBgmName = "";
@@ -499,21 +500,36 @@ function bgmMount(name) {
         __sgBgmEl = new Audio(name);
         __sgBgmEl.loop = true;
         __sgBgmName = name;
+        __sgBgmPlaying = false;
         return true;
     } catch (e) { __sgBgmEl = null; __sgBgmName = ""; return false; }
 }
 function bgmPlay(name) {
     if (!name) return false;
+    if (__sgBgmEl && (__sgBgmName === name) && __sgBgmPlaying) return true;
     if (!__sgBgmEl || __sgBgmName !== name) { if (!bgmMount(name)) return false; }
     try {
         var pr = __sgBgmEl.play();
+        __sgBgmPlaying = true;
+        if (pr && pr.catch) pr.catch(function () { __sgBgmPlaying = false; });
+        return true;
+    } catch (e) { __sgBgmPlaying = false; return false; }
+}
+function bgmStop() {
+    __sgBgmPlaying = false;
+    if (__sgBgmEl) { try { __sgBgmEl.pause(); } catch (e) {} }
+    return true;
+}
+// 一次性音效（点击/关闭/新闻提示等）：每次 new Audio，不循环；失败静默。
+function sndPlay(name) {
+    if (!name) return false;
+    try {
+        if (typeof Audio === "undefined" || !Audio) return false;
+        var el = new Audio(name);
+        var pr = el.play();
         if (pr && pr.catch) pr.catch(function () {});
         return true;
     } catch (e) { return false; }
-}
-function bgmStop() {
-    if (__sgBgmEl) { try { __sgBgmEl.pause(); } catch (e) {} }
-    return true;
 }
 
 // ============================================================================
@@ -557,7 +573,7 @@ var __SG_OPS = {
     touchCount: touchCount, touchX: touchX, touchY: touchY, compZ: compZ,
     // 叙事引擎扩展（t86；供 subs 经 __subl.call 调用，不在 @game 白名单内）
     saveLoad: saveLoad, saveGet: saveGet, saveKeys: saveKeys, saveDrop: saveDrop,
-    bgmMount: bgmMount, bgmPlay: bgmPlay, bgmStop: bgmStop,
+    bgmMount: bgmMount, bgmPlay: bgmPlay, bgmStop: bgmStop, sndPlay: sndPlay,
 };
 
 // 安装 __subl.call（不覆盖宿主/产物可能已有的 __subl.main 等字段）
