@@ -296,6 +296,18 @@ fun runSmoke(): Null {
     st = engTickStart(m, st)
     onScroll { dy =>
         var pn: Str = engField(st, F_PANEL())
+        var ph: Str = engField(st, F_PHASE())
+        if ((strCmp(ph, "events") == 0) && (strCmp(pn, "none") == 0) && (strCmp(qHead(engField(st, F_QUEUE())), "") != 0)) {
+            var ev: Json = evById(modEnt(m), qHead(engField(st, F_QUEUE())))
+            if (strCmp(jstr(ev, "kind"), "card") == 0) {
+                var n: Nat = cardContentLines(jstr(ev, "content"))
+                var maxOff: Nat = if (n > CC_TXT_FIT()) (n - CC_TXT_FIT()) else 0
+                var cur: Nat = engNum(st, F_SCROLL())
+                var nxt: Nat = if (dy > 0.0) (if (cur < maxOff) (cur + 1) else cur) else (if (cur > 0) (cur - 1) else 0)
+                if (nxt != cur) { objsDestroyTag("view"); renderEventRefresh(m, engSetNum(st, F_SCROLL(), nxt)); st = engSetNum(st, F_SCROLL(), nxt) } else null
+            } else null
+        } else {
+
         if (strCmp(pn, "none") != 0) {
             var ent: Json = modEnt(m)
             var n: Nat = if (strCmp(pn, "policy") == 0) policyCount(ent) else (if (strCmp(pn, "attrs") == 0) resCount(ent) else arrLen(jk(ent, "blocks")))
@@ -315,6 +327,7 @@ fun runSmoke(): Null {
             viewY = panYOf(ns, viewY, 0.0)
             viewS = ns
             applyView(ns, viewX, viewY)
+        }
         }
         }
     }

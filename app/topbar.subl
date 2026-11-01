@@ -6,12 +6,12 @@ fun TOP_TITLE_X(): Rat = 32.0
 fun CHIP_X0(): Rat = 560.0
 fun CHIP_W(): Rat = 148.0
 fun CHIP_DY(): Rat = 160.0
-fun DATE_CX(): Rat = 1780.0
+fun DATE_CX(): Rat = 1725.0
 fun TBAR_HEX(): Str = "#1F2327"
 fun SUB_HEX(): Str = "#B7BFC8"
 fun RES_HEX(): Str = "#E4E7EA"
 fun CHIP_HEX(): Str = "#2A2F35"
-fun AUTO_X(): Rat = 1612.0
+fun AUTO_X(): Rat = 1480.0
 fun AUTO_Y(): Rat = 20.0
 fun AUTO_S(): Rat = 48.0
 
@@ -33,9 +33,10 @@ fun refreshTopbar(m: Json, s: Str): Null {
     objsDestroyTag("ui-res")
     var md: Json = modMod(m)
     var dt: Str = dateText(engNum(s, F_Y()), engNum(s, F_M()), engNum(s, F_D()))
-    var tt: Str = if (strCmp(timeEra(md), "") == 0) dt else concat(concat(timeEra(md), " · "), dt)
-    var t1: Any = addTextC(tt, DATE_CX(), 44.0, 24.0, SUB_HEX(), "ui-time", true, 12.0)
-    null
+    var et: Str = timeEra(md)
+    if (strCmp(et, "") == 0) null else {
+        var e1: Any = addTextC(et, DATE_CX(), 18.0, 16.0, SUB_HEX(), "ui-time", true, 12.0)}
+    var t1: Any = addTextC(dt, DATE_CX(), 50.0, 24.0, SUB_HEX(), "ui-time", true, 12.0)
 }
 
 // 流逝按钮（顶栏右侧：每秒自动 tick 1 天；on = 进行中）

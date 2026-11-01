@@ -388,9 +388,9 @@ fun engOpsSettle(m: Json, s: Str): Str {
 fun engShowHead(m: Json, s: Str): Str {
     var ent: Json = modEnt(m)
     var h: Str = qHead(engField(s, F_QUEUE()))
-    var st: Str = engSet(engSet(engSetNum(s, F_STEP(), 0), F_FIRED(), toggleAdd(engField(s, F_FIRED()), h)), F_PHASE(), "events")
+    var st: Str = engSet(engSet(engSetNum(engSetNum(s, F_STEP(), 0), F_SCROLL(), 0), F_FIRED(), toggleAdd(engField(s, F_FIRED()), h)), F_PHASE(), "events")
     objsDestroyTag("view")
-    renderView(m, evById(ent, h), 0)
+    renderView(m, evById(ent, h), 0, engNum(st, F_SCROLL()))
     return st
 }
 @impure
@@ -422,7 +422,7 @@ fun engStepLines(m: Json, s: Str, ev: Json): Str {
     return (if (engNum(st, F_STEP()) >= cnt) engAdvanceQueue(m, engSet(st, F_QUEUE(), qPop(engField(st, F_QUEUE()), jstr(ev, "id"))))
     else {
         objsDestroyTag("view")
-        renderView(m, ev, engNum(st, F_STEP()))
+        renderView(m, ev, engNum(st, F_STEP()), engNum(st, F_SCROLL()))
         st
     })
 }

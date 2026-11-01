@@ -24,22 +24,59 @@ fun COL_BLACK(): Str = "#000000"
 
 // ---------- 总分发 ----------
 @impure
-fun renderView(m: Json, ev: Json, step: Nat): Null {
+@impure
+fun renderView(m: Json, ev: Json, step: Nat, off: Nat): Null {
     var kind: Str = jstr(ev, "kind")
-    if (strCmp(kind, "card") == 0) renderEventCard(m, ev, step)
+    if (strCmp(kind, "card") == 0) renderEventCard(m, ev, step, off)
     else (if (strCmp(kind, "imm") == 0) renderImmersive(m, ev, step)
-    else (if (strCmp(kind, "super") == 0) renderSuper(m, ev, step) else renderEventCard(m, ev, step)))
+    else (if (strCmp(kind, "super") == 0) renderSuper(m, ev, step) else renderEventCard(m, ev, step, off)))
     null
 }
 
-// ---------- 事件卡：MD3 Dialog（scrim + 圆角表面 + 标题 + 内容 + 按钮组） ----------
+fun CC_TXT_Y0(): Rat = 328.0
+fun CC_TXT_LH(): Rat = 40.0
+fun CC_TXT_FIT(): Nat = 4
+fun CC_TXT_BOT(): Rat = 488.0
+fun CC_TXT_BUDGET(): Rat = 30.0
+// 字符宽度单位：ASCII 半角 0.5，其余（CJK/全角）1.0；行预算 30 全角 ≈ 864px / 28px
+fun charW(ch: Str): Rat = if ((strCmp(ch, " ") >= 0) && (strCmp(ch, "¡") < 0)) 0.5 else 1.0
+// 折行：返回行列表（cons 头插，故第 k 行在 size-k-1）；递归参数取子串（严格变小）
 @impure
-fun renderEventCard(m: Json, ev: Json, step: Nat): Null {
+fun wrapLines(s: Str, acc: Rat, cur: Str, out: List[Str]): List[Str] =
+    if (length(s) == 0) (if (strCmp(cur, "") == 0) out else cons(cur, out))
+    else (if (acc + charW(charAt(s, 0)) > CC_TXT_BUDGET())
+        wrapLines(substring(s, 1, length(s)), charW(charAt(s, 0)), charAt(s, 0), cons(cur, out))
+      else wrapLines(substring(s, 1, length(s)), (acc + charW(charAt(s, 0))), concat(cur, charAt(s, 0)), out))
+// 行数（滚动上界用）
+@impure
+fun cardContentLines(s: Str): Nat = if (strCmp(s, "") == 0) 0 else size(wrapLines(s, 0.0, "", emptyList()))
+@impure
+fun renderEventCard(m: Json, ev: Json, step: Nat, off: Nat): Null {
     var o: Any = addRectT(1920.0, 1080.0, 0.0, 0.0, COL_DIM(), "view", 26.0)
     var o2: Any = addRoundRect(CC_W(), CC_H(), CC_X(), CC_Y(), COL_CARD(), "view", 30.0, CC_RAD())
-    var tt: Any = addTextT(jstr(ev, "title"), (CC_X() + 48.0), (CC_Y() + 40.0), 40.0, 700, COL_SOFT(), "view", true, 32.0)
-    var ct: Any = addTextWrap(jstr(ev, "content"), (CC_X() + 48.0), (CC_Y() + 108.0), 28.0, 400, (CC_W() - 96.0), COL_SOFT(), "view", true, 32.0)
+    var tt: Any = addTextT(jstr(ev, "title"), (CC_X() + 48.0), (CC_Y() + 40.0), 40.0, 700, COL_SOFT(), "view", true, 34.0)
+    var lines: List[Str] = wrapLines(jstr(ev, "content"), 0.0, "", emptyList())
+    cardTextLoop(lines, 0, size(lines), off)
     renderCardOptLoop(m, jk(ev, "options"), 0, arrLen(jk(ev, "options")))
+    null
+}
+// 文本视窗（y 328..488，4 行/屏）：越界行不绘制 -> 永不遮住标题与按钮
+@impure
+fun cardTextLoop(lines: List[Str], i: Nat, n: Nat, off: Nat): Null =
+    if (i >= n) null
+    else {
+        var y: Rat = CC_TXT_Y0() + ((toRat(i) - toRat(off)) * CC_TXT_LH())
+        if ((y >= CC_TXT_Y0()) && ((y + CC_TXT_LH()) <= CC_TXT_BOT())) {
+            var lt: Any = addTextT(strOr(elementAt(lines, (n - 1 - i)), ""), (CC_X() + 48.0), y, 28.0, 400, COL_SOFT(), "view", true, 31.0)
+        } else null
+        cardTextLoop(lines, (i + 1), n, off)
+    }
+// 滚动局部刷新（事件卡文本滚动用）
+@impure
+fun renderEventRefresh(m: Json, s: Str): Null {
+    var ev: Json = evById(modEnt(m), qHead(engField(s, F_QUEUE())))
+    objsDestroyTag("view")
+    renderEventCard(m, ev, engNum(s, F_STEP()), engNum(s, F_SCROLL()))
     null
 }
 @impure

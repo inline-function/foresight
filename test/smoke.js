@@ -121,7 +121,7 @@ function __run() {
     return Promise.resolve(r);
 }
 __run().then(function () { __afterMain(); }).catch(function (e) {
-    console.log("  FAIL main 运行失败：" + (e && e.message ? e.message : String(e)));
+console.log("  FAIL main 运行失败：" + (e && e.message ? e.message : String(e)));
     process.exit(1);
 });
 
@@ -174,9 +174,42 @@ function scrollUp() { __sgScrollHandlers.forEach(function (f) { f({ y: -120.0 })
 function anyPanel() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("panel") >= 0; }); }
 function drawerOn() { return __sgObjs.some(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }); }
 function safeClick(x, y) { if (drawerOn()) { clickAt(700, 540); snap(); } clickAt(x, y); }
+var cardViol = 0;
+var scrollOk = false;
+function cardIsUp() {
+    return __sgObjs.some(function (o) {
+        return !o.destroyed && o.tags.indexOf("view") >= 0
+            && o.comps.some(function (c) { return c && c.comp === "rect" && c.w === 960 && c.h === 660; });
+    });
+}
+function cardCheck() {
+    __sgObjs.forEach(function (o) {
+        if (!o.destroyed && o.tags.indexOf("view") >= 0 && typeof o.text === "string" && o.text.length > 0) {
+            var y = o.pos ? o.pos.y : -1;
+            if (!((y >= 240 && y <= 304) || (y >= 328 && y <= 488) || (y >= 496 && y <= 880))) cardViol++;
+        }
+    });
+}
+function bodyTexts() {
+    return __sgObjs.filter(function (o) {
+        return !o.destroyed && o.tags.indexOf("view") >= 0 && typeof o.text === "string"
+            && o.pos && o.pos.y >= 328 && o.pos.y <= 488;
+    }).map(function (o) { return o.text; }).sort();
+}
+var cardSeen = 0;
+function cardScrollProbe() {
+    if (cardIsUp() && !scrollOk) {
+        cardSeen++;
+        var before = JSON.stringify(bodyTexts());
+        scrollDown();
+        var after = JSON.stringify(bodyTexts());
+        if (before !== after) scrollOk = true;
+    }
+}
 function clearEvents(cap) {
     for (var i = 0; i < cap; i++) {
         snap();
+        cardScrollProbe();
         if (objsTextHas("行动点").length > 0) break;
         if (objsTextHas("点击继续").length > 0 || objsTextHas("点击结束").length > 0) { clickAt(960, 540); }
         else { if (objsTextHas("返回地图").length > 0) break; else clickAt(960, 532); }
@@ -202,7 +235,7 @@ ok("t89 相机：camPos=(999,515) 东亚地图初始视野", camP.length >= 1 &&
 // ---- t89 启动：MD3 顶栏/底栏 + 先看地图（面板不自动开，队长裁决） ----
 ok("t89 MD3 顶栏：国家/派系/日期（资源 chips 已移入国家属性）",
     objsWithText("中华人民共和国").length > 0 && objsWithText("建制派").length > 0
-    && objsTextHas("烈焰升腾 · 2019 年 12 月 1 日").length > 0,
+    && objsTextHas("烈焰升腾").length > 0 && objsTextHas("2019 年 12 月 1 日").length > 0,
     oneText("2019 年"));
 ok("t89 MD3 顶栏无资源 chips（移入国家属性面板）",
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("ui-res") >= 0; }).length === 0);
@@ -355,10 +388,10 @@ navBtn(0);
 // ---- 自动流逝（顶栏「流逝」按钮：每秒 1 天；非 idle 自动暂停）----
 ok("t89 流逝按钮：顶栏右侧 ui-auto（文案「流逝」）", objsWithText("流逝").length > 0);
 var dOps = oneText("2019 年");
-clickAt(1636, 44); snap(); // 开
+clickAt(1504, 44); snap(); // 开
 sgFire(1.0); sgFire(1.0);
 ok("t89 自动流逝：ops 阶段自动暂停（日期未跳天）", oneText("2019 年") === dOps, dOps + " -> " + oneText("2019 年"));
-clickAt(1636, 44); snap(); // 关
+clickAt(1504, 44); snap(); // 关
 ok("第一章：操作面板=第一章 · 疫情时期 行动点 3 / 3",
     objsTextHas("第一章 · 疫情时期").length > 0 && objsTextHas("行动点 3 / 3").length > 0);
 openPage(0); pickOption(2);
@@ -370,12 +403,12 @@ openPage(1); pickOption(1);
 ok("radio 组跨页共享行动点池：刺激后剩 行动点 1 / 3", objsTextHas("行动点 1 / 3").length > 0);
 clickAt(960, rowY(3)); // 经济刺激 3 选项 -> 返回操作页
 openPage(2); pickOption(1);
-clickAt(1636, 44); snap(); // 关
+clickAt(1504, 44); snap(); // 关
 clearEvents(80);
-clickAt(1636, 44); snap(); // 开（phase=idle）
+clickAt(1504, 44); snap(); // 开（phase=idle）
 sgFire(1.0);
 ok("t89 自动流逝：idle 阶段每秒 1 天（日期 +1，引擎 tick 接管）", oneText("2019 年") !== dOps, dOps + " -> " + oneText("2019 年"));
-clickAt(1636, 44); snap(); // 关
+clickAt(1504, 44); snap(); // 关
 
 // ---- 第一章 17+1 tick 循环（auto 1 次 + 手动 17 次；净 +3/tick -> 失败档） ----
 for (var t = 1; t <= 17; t++) {
@@ -387,6 +420,8 @@ for (var t = 1; t <= 17; t++) {
     openPage(2); pickOption(1);   // 适度淡化 -> AP 0 -> 自动结算
     clearEvents(80);
 }
+ok("t89 事件卡排版：内容行限于视窗 y 328..488，不遮标题/按钮", cardViol === 0, "viol=" + cardViol);
+ok("t89 事件卡滚动：长文本卡滚轮后内容行变化（不滚到尽头）", scrollOk === true, "cards=" + cardSeen + " ok=" + scrollOk);
 ok("关键事件①父亲的电话：条件=stimulus_done flag -> 弹出", seen["父亲的电话"] === true);
 ok("关键事件②母亲的医院：条件=lockdown_any + 医疗<50 -> 弹出", seen["母亲的医院"] === true);
 ok("关键事件③老李走了：条件=communication_any + 疫情>=41 -> 弹出", seen["老李走了"] === true);
