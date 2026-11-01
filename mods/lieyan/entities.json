@@ -157,7 +157,9 @@
      "v": "res.medical",
      "n": 20
     }
-   ]
+   ],
+   "desc": "建设临时医疗设施，集中收治轻症患者，把重症床位留给最需要的人。",
+   "duration": 14
   },
   {
    "id": "policy.healthcode",
@@ -177,7 +179,9 @@
      "v": "res.tech",
      "n": 5
     }
-   ]
+   ],
+   "desc": "基于健康码的出行分级管控体系，用数据代替封条。",
+   "duration": 21
   },
   {
    "id": "policy.lockdown",
@@ -207,7 +211,9 @@
      "v": "res.support",
      "n": -3
     }
-   ]
+   ],
+   "desc": "全面限制人员流动。代价高昂，但能最快压平疫情曲线。",
+   "duration": 10
   },
   {
    "id": "policy.detection",
@@ -228,7 +234,9 @@
      "v": "res.medical",
      "n": 10
     }
-   ]
+   ],
+   "desc": "提升检测能力，把隐性感染者从人群里找出来。",
+   "duration": 14
   },
   {
    "id": "policy.austerity",
@@ -249,7 +257,9 @@
      "v": "res.economy",
      "n": 6
     }
-   ]
+   ],
+   "desc": "压缩一切非必要开支，把财政集中于防疫一线。",
+   "duration": 14
   },
   {
    "id": "policy.epi",
@@ -272,7 +282,9 @@
      "v": "res.tech",
      "n": 4
     }
-   ]
+   ],
+   "desc": "组建专业流调队伍，抢在病毒前面追踪每一条传播链。",
+   "duration": 21
   },
   {
    "id": "policy.rework",
@@ -289,7 +301,9 @@
      "v": "res.economy",
      "n": 4
     }
-   ]
+   ],
+   "desc": "发布分阶段复工复产操作指引，让停摆的经济重新转动。",
+   "duration": 7
   },
   {
    "id": "policy.vaccine",
@@ -320,7 +334,9 @@
      "v": "res.support",
      "n": 4
     }
-   ]
+   ],
+   "desc": "集中科研力量加速疫苗研发与临床试验。",
+   "duration": 60
   },
   {
    "id": "policy.herd",
@@ -356,7 +372,9 @@
      "v": "res.danger",
      "n": 10
     }
-   ]
+   ],
+   "desc": "放弃清零，以自然感染建立人群免疫屏障。豪赌，且没有后悔药。",
+   "duration": 90
   }
  ],
  "chapters": [

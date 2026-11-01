@@ -299,27 +299,42 @@ navBtn(1);
 ok("t89 全屏切换：国策界面（方舱医院/健康码体系，lieyan 模组）",
     objsTextHas("方舱医院").length > 0 && objsTextHas("健康码体系").length > 0);
 ok("t89 全屏切换：切走后操作页残留=0（全屏覆盖）", objsTextHas("应急预案").length === 0);
-// ---- t90 HOI4 式国策树：图标上+板子下；any/all 前置 + 互斥 ----
-ok("t90 国策树布局：图标+板子 9 节点 3x3（方舱医院/严格封控/流调溯源/疫苗冲刺/群体免疫…疫情主题树）",
+// ---- t90 HOI4 式国策树：大图标上+板子下（仅国策名）；点节点弹详情对话框 + 「实施」按钮 ----
+ok("t90 国策树布局：大图标 9 节点 3x3（板上仅国策名，锁定原因进对话框）",
     ["方舱医院", "健康码体系", "严格封控", "扩大核酸检测", "紧缩节流", "流调溯源队伍", "复工指导手册", "疫苗研发冲刺", "群体免疫路线"]
     .every(function (n) { return objsTextHas(n).length > 0; }), "tree");
-ok("t90 前置 any/all：初始锁定 6 国策显示原因（需任一 x5 + 前置 x1：流调/检测/紧缩/疫苗/群体免疫/复工）",
-    objsTextHas("需任一：").length === 5 && objsTextHas("前置：").length === 1 && objsTextHas("前置：流调溯源队伍").length === 1,
-    "locktext=" + JSON.stringify(oneText("需任一")));
-clickAt(226, 300); snap(); // 方舱医院节点中心（col0,row0：图标+板子）
-ok("t90 前置 any 达成：方舱医院完成后，检测/紧缩可解去原因（剩 流调/疫苗/群体免疫 锁定 = 需任一 x3）",
-    objsTextHas("需任一：").length === 3 && objsTextHas("前置：").length === 1,
-    JSON.stringify(oneText("需任一")));
-clickAt(646, 300); snap(); // 扩大核酸检测节点中心（col1,row0）
-ok("t90 互斥分支：行「扩大核酸检测」后，对家显示「与【扩大核酸检测】互斥」，疫苗可解去原因（需任一 x2：流调/群体免疫）",
-    objsTextHas("与【扩大核酸检测】互斥").length > 0 && objsTextHas("需任一：").length === 2,
-    oneText("互斥"));
-clickAt(1066, 540); snap(); // 疫苗研发冲刺节点（col2,row1）
-ok("t90 互斥对链：行「疫苗研发冲刺」后，群体免疫路线显示「与【疫苗研发冲刺】互斥」（科学/放任二选一）",
-    objsTextHas("与【疫苗研发冲刺】互斥").length > 0,
-    oneText("群体免疫"));
-clickAt(646, 540); snap(); // 紧缩节流节点中心（col1,row1）互斥锁定 -> 点击无效
-ok("t90 互斥锁定：点紧缩节流无反应（仍锁定，「与【扩大核酸检测】互斥」原因不消失）", objsTextHas("与【扩大核酸检测】互斥").length > 0, oneText("紧缩"));
+clickAt(246, 316); snap(); // 方舱医院节点（col0,row0）-> 详情对话框
+ok("t90 对话框：点节点弹出详情（名称标题/描述/需要=无前置/效果/时长 + 「实施」按钮）",
+    objsTextHas("无前置，可直接实施").length > 0 && objsTextHas("医疗资源 +20").length > 0
+    && objsTextHas("14 天").length > 0 && objsTextHas("建设临时医疗设施").length > 0
+    && objsTextHas("实施").length > 0, oneText("方舱医院"));
+clickAt(960, 724); snap(); // 「实施」圆角按钮 -> 获取 + 关闭对话框
+ok("t90 实施按钮：点「实施」获取方舱医院（对话框关闭，回树；树上无原因文本）",
+    objsTextHas("无前置，可直接实施").length === 0 && objsTextHas("实施").length === 0,
+    anyPanel() ? "panel" : "closed");
+clickAt(706, 316); snap(); // 扩大核酸检测（col1,row0，前置任一已达成）-> 对话框
+ok("t90 对话框：前置达成（需要=需任一完成：方舱医院 / 健康码体系；状态=条件达成，可以实施）",
+    objsTextHas("需任一完成：方舱医院 / 健康码体系").length > 0 && objsTextHas("条件达成，可以实施").length > 0,
+    oneText("检测"));
+clickAt(960, 724); snap(); // 实施检测 -> 完成，对家紧缩节流转锁定
+ok("t90 互斥分支：行「扩大核酸检测」后树上无原因文本（锁定详情进对话框）",
+    objsTextHas("需任一").length === 0 && objsTextHas("与【").length === 0, "tree-clean");
+clickAt(706, 588); snap(); // 紧缩节流（col1,row1）-> 对话框（互斥锁定）
+ok("t90 对话框：互斥锁定 -> 状态「已锁定：与【扩大核酸检测】互斥（二选一）」+ 实施按钮变「已锁定」",
+    objsTextHas("已锁定：与【扩大核酸检测】互斥（二选一）").length > 0 && objsTextHas("已锁定").length > 0,
+    oneText("紧缩"));
+clickAt(960, 724); snap(); // 「已锁定」按钮 -> 无反应
+ok("t90 互斥锁定：锁定态按「已锁定」按钮关闭弹窗（不获取，回树）",
+    objsTextHas("已锁定：与【扩大核酸检测】互斥（二选一）").length === 0 && objsTextHas("紧缩节流").length > 0, anyPanel() ? "panel" : "closed");
+clickAt(1210, 60); snap(); // x 关闭对话框
+clickAt(1166, 588); snap(); // 疫苗研发冲刺（col2,row1，前置任一已达成）-> 对话框
+ok("t90 对话框：疫苗前置达成（时长 60 天 + 条件达成，可以实施）",
+    objsTextHas("60 天").length > 0 && objsTextHas("条件达成，可以实施").length > 0, oneText("疫苗"));
+clickAt(960, 724); snap(); // 实施疫苗
+clickAt(1166, 860); snap(); // 群体免疫路线（col2,row2）-> 对话框（与疫苗互斥）
+ok("t90 互斥对链：行「疫苗研发冲刺」后，群体免疫路线锁定（与【疫苗研发冲刺】互斥（二选一））",
+    objsTextHas("与【疫苗研发冲刺】互斥（二选一）").length > 0, oneText("群体免疫"));
+clickAt(1210, 60); snap(); // x 关闭（收尾，回树）
 navBtn(2);
 ok("t89 全屏切换：国家属性界面（9 资源全列 + 产出/天；医疗资源受国策方舱医院 +20 影响）",
     objsTextHas("医疗资源").length > 0 && objsTextHas("产出 0/天").length > 0 && objsTextHas("产出 20/天").length > 0,

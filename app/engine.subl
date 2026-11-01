@@ -34,7 +34,8 @@ fun F_CHNEXT(): Nat = 18
 fun F_SCROLL(): Nat = 19
 fun F_DRAWER(): Nat = 20
 fun F_TROOPS(): Nat = 21
-fun F_N(): Nat = 22
+fun F_PSEL(): Nat = 22  // 国策详情弹窗选中（0=关，i+1=第 i 国策）
+fun F_N(): Nat = 23
 
 // ---------- 字段读写 ----------
 fun catS(a: Str, b: Str): Str = concat(concat(a, "@"), b)
@@ -334,6 +335,7 @@ fun engInit(md: Json, ent: Json): Str {
     s = catS(s, "0")
     s = catS(s, "none")
     s = catS(s, "|")  // troops: name:n|name:n|…
+    s = catS(s, "0")  // F_PSEL: 国策详情弹窗（0=关）
     return s
 }
 

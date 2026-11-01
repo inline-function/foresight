@@ -413,7 +413,12 @@ onUpdate { dt =>
             var ph: Str = engField(st, F_PHASE())
             if (strCmp(ph, "over") == 0) null
             else {
-                if ((strCmp(engField(st, F_DRAWER()), "none") != 0) && (!startsWith(engField(st, F_DRAWER()), "m:"))) {
+                // 国策详情对话框（优先于其它点击）
+            if ((strCmp(engField(st, F_PANEL()), "policy") == 0) && (engNum(st, F_PSEL()) > 0)) {
+                consumed = true
+                st = policyDialogHit(m, st, pressX, pressY)
+            } else null
+            if ((strCmp(engField(st, F_DRAWER()), "none") != 0) && (!startsWith(engField(st, F_DRAWER()), "m:"))) {
                     if (pressX < DR_W()) {
                         if ((pressX >= 520.0) && (pressX < 592.0) && (pressY >= 24.0) && (pressY < 96.0)) {
                             drClosing = true

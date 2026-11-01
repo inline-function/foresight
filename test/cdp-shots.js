@@ -123,6 +123,7 @@ class CDP {
   await shot("F:\\SublimationProject\\foresight\\test\\shot-drawer-closed.png", [560, 60]);
 // 政策面板：底栏第 2 个按钮（国策），验证 ic-* 图标渲染
 await shot("F:\\SublimationProject\\foresight\\test\\shot-panel-policy.png", [720, 1044]);
+await shot("F:\\SublimationProject\\foresight\\test\\shot-panel-dialog.png", [[720, 1044], [246, 316]]); // 国策面板 -> 点方舱医院节点 -> 详情对话框
   edge.kill();
   process.exit(0);
 })().catch(e => { console.log("ERR", e.message.slice(0, 200)); process.exit(1); });

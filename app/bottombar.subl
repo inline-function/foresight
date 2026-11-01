@@ -139,6 +139,8 @@ fun renderPanelBody(m: Json, s: Str, kind: Str): Str {
     var n: Nat = if (strCmp(kind, "policy") == 0) policyCount(ent) else (if (strCmp(kind, "attrs") == 0) resCount(ent) else arrLen(jk(ent, "blocks")))
     if (strCmp(kind, "policy") == 0) renderPolicyRows(m, s, off, n, off)
     else { if (strCmp(kind, "attrs") == 0) renderAttrRows(m, s, off, n, off) else renderBlocksRows(m, off, n, off) }
+    var selN: Nat = engNum(s, F_PSEL())
+    if ((strCmp(kind, "policy") == 0) && (selN > 0)) { renderPolicyDialog(m, s, (selN - 1)) } else null
     return engSet(s, F_PANEL(), kind)
 }
 
@@ -160,14 +162,14 @@ fun renderAttrRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
 fun policyIconName(i: Nat): Str = if (i == 0) "ic-fangcang" else (if (i == 1) "ic-healthcode" else (if (i == 2) "ic-lockdown" else (if (i == 3) "ic-detection" else (if (i == 4) "ic-austerity" else (if (i == 5) "ic-epi" else (if (i == 6) "ic-rework" else (if (i == 7) "ic-vaccine" else (if (i == 8) "ic-herd" else ""))))))))
 fun policyIconW(i: Nat): Rat = if (i == 0) 164.0 else (if (i == 1) 162.0 else (if (i == 2) 172.0 else (if (i == 3) 140.0 else (if (i == 4) 194.0 else (if (i == 5) 217.0 else (if (i == 6) 185.0 else (if (i == 7) 164.0 else 164.0)))))))
 fun policyIconH(i: Nat): Rat = if (i == 0) 140.0 else (if (i == 1) 150.0 else (if (i == 2) 140.0 else (if (i == 3) 140.0 else (if (i == 4) 150.0 else (if (i == 5) 150.0 else (if (i == 6) 120.0 else (if (i == 7) 140.0 else 150.0)))))))
-fun policyIconFit(i: Nat): Rat = if ((120.0 / policyIconW(i)) < (120.0 / policyIconH(i))) (120.0 / policyIconW(i)) else (120.0 / policyIconH(i))
+fun policyIconFit(i: Nat): Rat = if ((160.0 / policyIconW(i)) < (160.0 / policyIconH(i))) (160.0 / policyIconW(i)) else (160.0 / policyIconH(i))
 // ---------- 国策树布局（HOI4 式：前置深度分层，同列按序竖排） ----------
 fun TREE_X0(): Rat = 96.0
 fun TREE_Y0(): Rat = 196.0
-fun NT_W(): Rat = 260.0
-fun NT_H(): Rat = 208.0
-fun NT_CX(): Rat = 420.0
-fun NT_CY(): Rat = 240.0
+fun NT_W(): Rat = 300.0
+fun NT_H(): Rat = 240.0
+fun NT_CX(): Rat = 460.0
+fun NT_CY(): Rat = 272.0
 fun EDGE_HEX(): Str = "#5A6470"
 // 国策两态：完成=亮板子，未完成=暗板子（文字说明前置/互斥原因）
 fun PLAQ_ON(): Str = "#7FA8D9"
@@ -233,16 +235,30 @@ fun policyNamesOf(ent: Json, req: Json, i: Nat, n: Nat, sep: Str): Str =
         if (strCmp(part, "") == 0) rest else (if (strCmp(rest, "") == 0) part else concat(concat(part, sep), rest))
     }
 @impure
-fun policyLockText(ent: Json, s: Str, i: Nat): Str =
-    if (policyAcquired(ent, s, i)) ""
-    else (if (policyCanAcquire(ent, s, i)) "" else policyBlockText(ent, s, i))
+fun policyNeedText(ent: Json, i: Nat): Str {
+    var rq: Json = policyPrereqList(ent, i)
+    return (if (arrLen(rq) == 0) "无前置，可直接实施"
+    else (if (strCmp(policyPrereqMode(ent, i), "any") == 0) concat("需任一完成：", policyNamesOf(ent, rq, 0, arrLen(rq), " / ")) else concat("需全部完成：", policyNamesOf(ent, rq, 0, arrLen(rq), " / "))))
+}
 @impure
-fun policyBlockText(ent: Json, s: Str, i: Nat): Str =
-    if (policyMutexLocked(ent, s, i)) concat("与【", concat(policyNamesOf(ent, policyMutexList(ent, i), 0, arrLen(policyMutexList(ent, i)), "/"), "】互斥"))
+fun policyMutexText(ent: Json, i: Nat): Str {
+    var mx: Json = policyMutexList(ent, i)
+    return (if (arrLen(mx) == 0) ""
+    else concat("与【", concat(policyNamesOf(ent, mx, 0, arrLen(mx), "/"), "】互斥（二选一）")))
+}
+@impure
+fun policyEffText(ent: Json, i: Nat): Str =
+    effTextLoop(ent, jk(policyRow(ent, i), "effects"), 0, arrLen(jk(policyRow(ent, i), "effects")))
+@impure
+fun effTextLoop(ent: Json, es: Json, i: Nat, n: Nat): Str =
+    if (i >= n) ""
     else {
-        var rq: Json = policyPrereqList(ent, i)
-        if (arrLen(rq) == 0) ""
-        else (if (strCmp(policyPrereqMode(ent, i), "any") == 0) concat("需任一：", policyNamesOf(ent, rq, 0, arrLen(rq), " 或 ")) else concat("前置：", policyNamesOf(ent, rq, 0, arrLen(rq), "、")))
+        var e: Json = arrAt(es, i)
+        var nm: Str = lookupName(jk(ent, "resources"), jstr(e, "v"))
+        var dv: Rat = jnum(e, "n")
+        var part: Str = concat(nm, concat(if (dv >= 0.0) " +" else " ", strReplace(toStr(dv), ".0", "")))
+        var rest: Str = effTextLoop(ent, es, (i + 1), n)
+        if (strCmp(rest, "") == 0) part else concat(concat(part, "；"), rest)
     }
 // ---------- 树渲染 ----------
 @impure
@@ -261,15 +277,12 @@ fun renderPolicyRows(m: Json, s: Str, i: Nat, n: Nat, off: Nat): Null =
             var fit: Rat = policyIconFit(i)
             var iw: Rat = (policyIconW(i) * fit)
             var ih: Rat = (policyIconH(i) * fit)
-            if (strCmp(icn, "") != 0) { addIconT(icn, (x + ((NT_W() - iw) / 2.0)), (y + 8.0 + ((120.0 - ih) / 2.0)), fit, "panel", 33.0, if (acq) "#FFFFFF" else "#7D8590") } else null
-            // 板子（国策名 + 原因小字；完成=亮，未完成=暗）
-            var box: Any = addRoundRect((NT_W() - 16.0), 60.0, (x + 8.0), (y + 136.0), if (acq) PLAQ_ON() else PLAQ_OFF(), "panel", 32.0, 10.0)
+            if (strCmp(icn, "") != 0) { addIconT(icn, (x + ((NT_W() - iw) / 2.0)), (y + 12.0 + ((160.0 - ih) / 2.0)), fit, "panel", 33.0, if (acq) "#FFFFFF" else "#7D8590") } else null
+            // 板子（只写国策名、居中；完成=亮，未完成=暗）
+            var box: Any = addRoundRect((NT_W() - 16.0), 64.0, (x + 8.0), (y + 168.0), if (acq) PLAQ_ON() else PLAQ_OFF(), "panel", 32.0, 12.0)
             var nm: Str = jstr(policyRow(ent, i), "name")
-            var tw: Rat = (22.0 * toRat(length(nm)))
-            var mt: Any = addTextT(nm, (x + 8.0 + ((244.0 - tw) / 2.0)), (y + 146.0), 22.0, 600, if (acq) PLAQ_TXT_ON() else TXT_VAR(), "panel", true, 33.0)
-            var rst: Str = policyLockText(ent, s, i)
-            var rw: Rat = (14.0 * toRat(length(rst)))
-            var st: Any = addTextT(rst, (x + 8.0 + ((244.0 - rw) / 2.0)), (y + 180.0), 14.0, 400, TXT_VAR(), "panel", true, 33.0)
+            var tw: Rat = (24.0 * toRat(length(nm)))
+            var mt: Any = addTextT(nm, (x + 8.0 + ((284.0 - tw) / 2.0)), (y + 186.0), 24.0, 600, if (acq) PLAQ_TXT_ON() else TXT_VAR(), "panel", true, 33.0)
             renderPolicyRows(m, s, (i + 1), n, off)
         }
     }
@@ -302,7 +315,7 @@ fun policyPanelHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
     var n: Nat = policyCount(ent)
     var off: Nat = engNum(s, F_SCROLL())
     var ri: Nat = policyTreeHit(ent, mx, my, off, 0, n)
-    return (if (ri < n) engPolicyAcquire(m, s, ri) else s)
+    return (if (ri < n) renderPanelKind(m, engSetNum(s, F_PSEL(), (ri + 1)), "policy") else s)
 }
 @impure
 fun policyTreeHit(ent: Json, mx: Rat, my: Rat, off: Nat, i: Nat, n: Nat): Nat =
@@ -313,6 +326,62 @@ fun policyTreeHit(ent: Json, mx: Rat, my: Rat, off: Nat, i: Nat, n: Nat): Nat =
         if ((mx >= x) && (mx < (x + NT_W())) && (my >= y) && (my < (y + NT_H()))) i else policyTreeHit(ent, mx, my, off, (i + 1), n)
     }
 
+// ---------- 国策详情对话框（名称/描述/需要/效果/时长 + 实施按钮） ----------
+fun PD_W(): Rat = 620.0
+fun PD_H(): Rat = 640.0
+fun PD_X(): Rat = 650.0
+fun PD_Y(): Rat = 160.0
+fun PD_BG(): Str = "#23282D"
+fun PD_LINE(): Str = "#3A4047"
+@impure
+fun renderPolicyDialog(m: Json, s: Str, i: Nat): Null {
+    var ent: Json = modEnt(m)
+    var row: Json = policyRow(ent, i)
+    var acq: Bool = policyAcquired(ent, s, i)
+    var lck: Bool = policyMutexLocked(ent, s, i)
+    var can: Bool = ((!acq) && (!lck) && policyCanAcquire(ent, s, i))
+    var card: Any = addRoundRect(PD_W(), PD_H(), PD_X(), PD_Y(), PD_BG(), "panel", 50.0, 24.0)
+    var xb: Any = addRoundRect(72.0, 72.0, (PD_X() + (PD_W() - 96.0)), (PD_Y() + 24.0), PD_LINE(), "panel", 51.0, 20.0)
+    var xt: Any = addTextT("x", (PD_X() + (PD_W() - 72.0)), (PD_Y() + 38.0), 38.0, 700, TXT_HEX(), "panel", true, 52.0)
+    var tt: Any = addTextT(jstr(row, "name"), (PD_X() + 40.0), (PD_Y() + 36.0), 34.0, 700, TXT_HEX(), "panel", true, 51.0)
+    var ln0: Any = addRectT((PD_W() - 80.0), 2.0, (PD_X() + 40.0), (PD_Y() + 96.0), PD_LINE(), "panel", 51.0)
+    var dd: Any = addTextWrap(jstr(row, "desc"), (PD_X() + 40.0), (PD_Y() + 124.0), 20.0, 4, (PD_W() - 80.0), TXT_VAR(), "panel", true, 51.0)
+    var lb1: Any = addTextT("需要", (PD_X() + 40.0), (PD_Y() + 216.0), 20.0, 400, COL_SKIP(), "panel", true, 51.0)
+    var vl1: Any = addTextWrap(policyNeedText(ent, i), (PD_X() + 160.0), (PD_Y() + 216.0), 20.0, 4, (PD_W() - 220.0), TXT_HEX(), "panel", true, 51.0)
+    var lb3: Any = addTextT("效果", (PD_X() + 40.0), (PD_Y() + 296.0), 20.0, 400, COL_SKIP(), "panel", true, 51.0)
+    var vl3: Any = addTextWrap(policyEffText(ent, i), (PD_X() + 160.0), (PD_Y() + 296.0), 20.0, 4, (PD_W() - 220.0), TXT_HEX(), "panel", true, 51.0)
+    var lb4: Any = addTextT("时长", (PD_X() + 40.0), (PD_Y() + 360.0), 20.0, 400, COL_SKIP(), "panel", true, 51.0)
+    var vl4: Any = addTextT(concat(concat(strReplace(toStr(jnum(row, "duration")), ".0", ""), " 天"), if (acq) "（已实施）" else ""), (PD_X() + 160.0), (PD_Y() + 360.0), 20.0, 400, TXT_HEX(), "panel", true, 51.0)
+    var stat: Str = if (acq) "已完成" else (if (lck) concat("已锁定：", policyMutexText(ent, i)) else (if (can) "条件达成，可以实施" else policyNeedText(ent, i)))
+    var statT: Any = addTextT(stat, (PD_X() + 40.0), (PD_Y() + 424.0), 20.0, 400, if (can) "#7FA8D9" else TXT_VAR(), "panel", true, 51.0)
+    var actLabel: Str = if (acq) "已完成" else (if (lck) "已锁定" else (if (can) "实施" else "未达成"))
+    var act: Any = addRoundRect(280.0, 72.0, (PD_X() + 170.0), (PD_Y() + (PD_H() - 112.0)), if (can) PRIMARY_HEX() else PD_LINE(), "panel", 51.0, 24.0)
+    var actT: Any = addTextT(actLabel, (PD_X() + 283.0), (PD_Y() + (PD_H() - 88.0)), 27.0, 700, if (can) DR_ONPRI() else TXT_VAR(), "panel", true, 52.0)
+    return null
+}
+@impure
+fun policyDialogHit(m: Json, s: Str, mx: Rat, my: Rat): Str {
+    var i: Nat = (engNum(s, F_PSEL()) - 1)
+    // x 关闭
+    if ((mx >= (PD_X() + (PD_W() - 96.0))) && (mx < (PD_X() + (PD_W() - 24.0))) && (my >= (PD_Y() + 24.0)) && (my < (PD_Y() + 96.0))) {
+        var sc: Bool = sfxPlay("close")
+        var s0: Str = engSetNum(s, F_PSEL(), 0)
+        return renderPanelKind(m, s0, "policy")
+    } else null
+    // 实施按钮
+    if ((mx >= (PD_X() + 170.0)) && (mx < (PD_X() + 450.0)) && (my >= (PD_Y() + (PD_H() - 112.0))) && (my < (PD_Y() + (PD_H() - 40.0)))) {
+        var s1: Str = engSetNum(s, F_PSEL(), 0)
+        var s2: Str = engPolicyAcquire(m, s1, i)
+        return renderPanelKind(m, s2, "policy")
+    } else null
+    // 卡片外 -> 关闭；卡片内 -> 不穿透
+    if ((mx < PD_X()) || (mx > (PD_X() + PD_W())) || (my < PD_Y()) || (my > (PD_Y() + PD_H()))) {
+        var sc2: Bool = sfxPlay("close")
+        var s3: Str = engSetNum(s, F_PSEL(), 0)
+        return renderPanelKind(m, s3, "policy")
+    } else null
+    return s
+}
 // ---------- 操作：页列表（MD3 列表 + 结束操作行） ----------
 @impure
 fun renderOpsMain(m: Json, s: Str): Null {
