@@ -87,6 +87,9 @@ class CDP {
   const { spawn } = require("child_process");
   const edge = spawn(EDGE, ["--headless=new", "--disable-gpu", "--no-sandbox", "--remote-debugging-port=" + PORT, "--window-size=1920,1080", "about:blank"]);
   await new Promise(r => setTimeout(r, 3500));
+  for (var wtries = 0; wtries < 60; wtries++) {
+    try { await httpGet("/json/version"); break; } catch (e2) { await new Promise(r => setTimeout(r, 500)); }
+  }
   console.log("EDGE-UP");
   try { console.log("VER", JSON.stringify(await httpGet("/json/version")).slice(0, 120)); } catch (e) { console.log("VERFAIL " + e.message.slice(0, 100)); }
   const targets = await httpGet("/json/list");

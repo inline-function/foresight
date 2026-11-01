@@ -5,7 +5,7 @@
 
 // ---------- 几何与色板 ----------
 fun DR_W(): Rat = 620.0
-fun DR_Z(): Rat = 36.0
+fun DR_Z(): Rat = 41.0
 fun DR_CARD(): Str = "#242A31"
 fun DR_CHIP(): Str = "#2E353D"
 fun DR_LINE(): Str = "#3A424B"
