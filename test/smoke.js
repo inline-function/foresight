@@ -299,22 +299,23 @@ navBtn(1);
 ok("t89 全屏切换：国策界面（方舱医院/健康码体系，lieyan 模组）",
     objsTextHas("方舱医院").length > 0 && objsTextHas("健康码体系").length > 0);
 ok("t89 全屏切换：切走后操作页残留=0（全屏覆盖）", objsTextHas("应急预案").length === 0);
-// ---- t90 HOI4 式国策树：二维节点 + any/all 前置 + 互斥 ----
-ok("t90 国策树布局：5 节点二维排布（方舱医院/健康码体系/扩大核酸检测/紧缩节流）",
+// ---- t90 HOI4 式国策树：图标上+板子下；any/all 前置 + 互斥 ----
+ok("t90 国策树布局：图标+板子 5 节点（方舱医院/健康码体系/扩大核酸检测/紧缩节流）",
     objsTextHas("方舱医院").length > 0 && objsTextHas("健康码体系").length > 0
     && objsTextHas("扩大核酸检测").length > 0 && objsTextHas("紧缩节流").length > 0, "tree");
-ok("t90 前置 any：未达前置时副文本「需任一：方舱医院 或 健康码体系」",
-    objsTextHas("需任一：").length > 0,
+ok("t90 前置 any：未达前置时板下小字「需任一：方舱医院 或 健康码体系」（锁定才显示原因）",
+    objsTextHas("需任一：").length === 2,
     "locktext=" + JSON.stringify(oneText("需任一")));
-clickAt(282, 244); snap(); // 方舱医院节点（col0,row0）
-ok("国策回归：点击节点获取「方舱医院」-> 已行（绿底节点）", objsTextHas("已行 方舱医院").length > 0, oneText("已行"));
-ok("t90 前置 any 达成：扩大核酸检测 -> 可解（任一前置完成）", objsTextHas("可解 扩大核酸检测").length > 0, oneText("可解"));
-clickAt(754, 376); snap(); // 扩大核酸检测节点（col1,row1）
-ok("t90 互斥分支：行「扩大核酸检测」-> 已行，对家显示「与【扩大核酸检测】互斥」",
-    objsTextHas("已行 扩大核酸检测").length > 0 && objsTextHas("与【扩大核酸检测】互斥").length > 0,
+clickAt(226, 300); snap(); // 方舱医院节点中心（col0,row0：图标+板子）
+ok("t90 前置 any 达成：方舱医院完成后，扩大核酸检测/紧缩节流的「需任一」原因消失（可解不显示原因）",
+    objsTextHas("需任一：").length === 0,
+    anyPanel() ? "panel-on" : "panel-off");
+clickAt(646, 540); snap(); // 扩大核酸检测节点中心（col1,row1）
+ok("t90 互斥分支：行「扩大核酸检测」后，对家板下显示「与【扩大核酸检测】互斥」（锁定原因）",
+    objsTextHas("与【扩大核酸检测】互斥").length > 0 && objsTextHas("需任一：").length === 0,
     oneText("互斥"));
-clickAt(754, 508); snap(); // 紧缩节流节点（col1,row2）互斥锁定 -> 点击无效
-ok("t90 互斥锁定：点紧缩节流无反应（无「已行 紧缩节流」）", objsTextHas("已行 紧缩节流").length === 0, oneText("紧缩"));
+clickAt(646, 780); snap(); // 紧缩节流节点中心（col1,row2）互斥锁定 -> 点击无效
+ok("t90 互斥锁定：点紧缩节流无反应（仍锁定，「与【扩大核酸检测】互斥」原因不消失）", objsTextHas("与【扩大核酸检测】互斥").length > 0, oneText("紧缩"));
 navBtn(2);
 ok("t89 全屏切换：国家属性界面（9 资源全列 + 产出/天；医疗资源受国策方舱医院 +20 影响）",
     objsTextHas("医疗资源").length > 0 && objsTextHas("产出 0/天").length > 0 && objsTextHas("产出 20/天").length > 0,
@@ -554,7 +555,7 @@ ok("BGM 映射：超事件 bgm id 与 assets/audio/<id>.wav 同名同在（fail_
 var icDir = path.join(gameDir, "assets", "img");
 var icns = ["ic-fangcang", "ic-healthcode", "ic-rework"];
 var missIc = icns.filter(function (id) { return !fse.existsSync(path.join(icDir, id + ".png")); });
-ok("图标落包：assets/img/ic-*.png（3 张国策图标）", missIc.length === 0, missIc.join(",") || "all");
+ok("图标落包：assets/img/ic-*.png（5 张国策图标）", missIc.length === 0, missIc.join(",") || "all");
 
 if (fails === 0) console.log("SMOKE: ALL PASSED（t89 MD3+2x：1920x1080 画布/顶栏 chips/底栏导航图标/全屏界面+返回键/MD3 卡与圆角/地图几何 x2/状态层 + 音频图标接入 + lieyan 全流程回归）");
 else console.log("SMOKE: FAILED " + fails + " 项");

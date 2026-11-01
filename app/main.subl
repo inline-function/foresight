@@ -136,11 +136,12 @@ fun addTextT(t: Str, x: Rat, y: Rat, size: Rat, w: Nat, hex: Str, tag: Str, fixe
 }
 // 精灵图标（fixed + z；sc 按图标原始像素折算）
 @impure
-fun addIconT(name: Str, x: Rat, y: Rat, sc: Rat, tag: Str, z: Rat): Null {
+fun addIconT(name: Str, x: Rat, y: Rat, sc: Rat, tag: Str, z: Rat, hex: Str): Null {
     unchecked var o = objAdd()
     unchecked objUse(o, compPos(x, y))
     unchecked objUse(o, compSprite(name))
     unchecked objUse(o, compScale(sc))
+    unchecked objUse(o, compColorHex(hex))
     unchecked objUse(o, compFixed())
     unchecked objUse(o, compZ(z))
     unchecked objTag(o, tag)
@@ -312,6 +313,8 @@ fun runSmoke(): Null {
     var l0: Null = spriteLoad("ic-fangcang", "assets/img/ic-fangcang.png")
     var l1: Null = spriteLoad("ic-healthcode", "assets/img/ic-healthcode.png")
     var l2: Null = spriteLoad("ic-rework", "assets/img/ic-rework.png")
+    var l3: Null = spriteLoad("ic-detection", "assets/img/ic-detection.png")
+    var l4: Null = spriteLoad("ic-austerity", "assets/img/ic-austerity.png")
     var au0: Bool = bgmPlayId(BGM_MAIN())
     onScroll { dy =>
         var pn: Str = engField(st, F_PANEL())
