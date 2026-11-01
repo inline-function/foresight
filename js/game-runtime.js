@@ -520,6 +520,12 @@ function bgmStop() {
     if (__sgBgmEl) { try { __sgBgmEl.pause(); } catch (e) {} }
     return true;
 }
+// 随机整数（含两端；供移动音效等的离散随机选择）
+function rndInt(lo, hi) {
+    var a = Math.floor(lo), b = Math.floor(hi);
+    if (!(b >= a)) return a;
+    return a + Math.floor(Math.random() * (b - a + 1));
+}
 // 一次性音效（点击/关闭/新闻提示等）：每次 new Audio，不循环；失败静默。
 function sndPlay(name) {
     if (!name) return false;
@@ -573,7 +579,7 @@ var __SG_OPS = {
     touchCount: touchCount, touchX: touchX, touchY: touchY, compZ: compZ,
     // 叙事引擎扩展（t86；供 subs 经 __subl.call 调用，不在 @game 白名单内）
     saveLoad: saveLoad, saveGet: saveGet, saveKeys: saveKeys, saveDrop: saveDrop,
-    bgmMount: bgmMount, bgmPlay: bgmPlay, bgmStop: bgmStop, sndPlay: sndPlay,
+    bgmMount: bgmMount, bgmPlay: bgmPlay, bgmStop: bgmStop, sndPlay: sndPlay, rndInt: rndInt,
 };
 
 // 安装 __subl.call（不覆盖宿主/产物可能已有的 __subl.main 等字段）

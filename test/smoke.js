@@ -355,6 +355,13 @@ clickAt(152, 64); snap(); // 返回地图
 clickAt(1233, 379); snap(); // 重新打开北京市抽屉
 clickAt(1233, 379); snap(); // 拦截后重新打开北京市抽屉
 ok("t89 抽屉驻军：数量 3 + 移动军队按钮", objsTextHas("移动军队").length > 0);
+// 拦截 sndPlay op：验证移动音效只触发一次、且为 moving 系列
+var __sgSfxLog = [];
+var __origSgCall = globalThis.__subl.call;
+globalThis.__subl.call = function (op, args) {
+    if (op === "sndPlay" && args && args[0]) { __sgSfxLog.push(String(args[0])); }
+    return __origSgCall.call(globalThis.__subl, op, args);
+};
 clickAt(440, 736); snap(); // 移动军队按钮 -> 进入移动模式（抽屉关闭、地图高亮邻接地）
 ok("t89 移动模式：抽屉关闭 + 地图高亮邻近陆地(>=2，海域不亮) + 提示语",
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("drawer") >= 0; }).length === 0
@@ -366,6 +373,8 @@ ok("t89 驻军移动：移动后抽屉收回、高亮解除（无抽屉/movetarg
 clickAt(1233, 379); snap(); // 重开北京市抽屉验兵力
 ok("t89 驻军移动：北京驻军 3 -> 2（抽屉重开、移动军队按钮仍可用）",
     objsTextHas("驻扎军队").length > 0 && objsTextHas("移动军队").length > 0);
+ok("t90 移动音效：moving 系列随机一首、仅播放一次（sndPlay(sfx-mov-N) 单次，不循环）",
+    __sgSfxLog.filter(function (f) { return /sfx-mov-[1-8]\.wav$/.test(f); }).length === 1, JSON.stringify(__sgSfxLog));
 clickAt(440, 736); snap(); // 再次进入移动模式
 ok("t89 移动模式重入：高亮陆地邻接 >= 2 + 提示语（海域不渡）",
     __sgObjs.filter(function (o) { return !o.destroyed && o.tags.indexOf("movetarget") >= 0; }).length >= 2 && objsTextHas("移动军队：点击高亮地块（北京市）").length > 0);
@@ -528,9 +537,12 @@ ok("音乐接入点：空名/缺失资产 bgmPlay 静默 false，bgmStop 无异�
 // ---- 音频/图标接入（t90）：sndPlay op + 资产落包 ----
 var s1 = sv.call("sndPlay", [""]);
 var s2 = sv.call("sndPlay", ["no-such-file.wav"]);
+var ris = [];
+for (var ri = 0; ri < 60; ri++) { var rv = sv.call("rndInt", [1, 8]); ris.push(rv); }
+ok("随机 op：rndInt(1,8) 已注册且采样落在 [1,8]（含两端、分散>=5 档）", ris.every(function (v) { return v >= 1 && v <= 8; }) && ris.filter(function (v, i, a) { return a.indexOf(v) === i; }).length >= 5, JSON.stringify(ris.slice(0, 12)));
 ok("音效 op：空名/缺失资产 sndPlay 静默 false（Node 无 Audio）", s1 === false && s2 === false, JSON.stringify([s1, s2]));
 var auDir = path.join(gameDir, "assets", "audio");
-var sfxIds = ["click", "close", "start", "news"];
+var sfxIds = ["click", "close", "start", "news"].concat([1, 2, 3, 4, 5, 6, 7, 8].map(function (i) { return "mov-" + i; }));
 var bgmIds = ["main", "prologue", "ch1-open", "end-excellent", "end-pass", "end-fail", "end-collapse"];
 var missFx = sfxIds.filter(function (id) { return !fse.existsSync(path.join(auDir, "sfx-" + id + ".wav")); });
 var missBgm = bgmIds.filter(function (id) { return !fse.existsSync(path.join(auDir, "bgm-" + id + ".wav")); });

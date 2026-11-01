@@ -3,7 +3,7 @@
 // 资产约定（assets/ 由 build.ps1 随包）：
 //   bgm —— assets/audio/<bgm id>.wav：与模组 entities.events 中 kind=super 的 bgm 字段同名，
 //          bgm-main 为正常进行曲；超事件 bgm 接管，事件阶段结束后回到 bgm-main
-//   sfx —— assets/audio/sfx-<id>.wav：click / close / start / news
+//   sfx —— assets/audio/sfx-<id>.wav：click / close / start / news / mov-1..8（moving 系列，移动时随机一首）
 // Audio 环境缺失（Node smoke）/浏览器手势策略拦截自动播放时一律静默 false，不阻断游戏流；
 // 运行时同名 BGM 去重（播放失败会置未播放，下一帧自动重试），故可逐帧调用。
 
@@ -12,6 +12,7 @@
 @game @host @impure fun bgmPlay(name: Str): Bool
 @game @host @impure fun bgmStop(): Bool
 @game @host @impure fun sndPlay(name: Str): Bool
+@game @host @impure fun rndInt(lo: Nat, hi: Nat): Nat
 
 // ---------- 曲目/音效表 ----------
 fun BGM_MAIN(): Str = "bgm-main"
@@ -26,6 +27,14 @@ fun bgmPlayId(id: Str): Bool {
 }
 
 // 按 sfx id 播一次性音效（click/close/start/news）
+
+// 军队移动音效：moving 系列（TFR prc_Moving）随机一首，播放一次、不循环
+fun MOV_N(): Nat = 8
+@impure
+fun sfxPlayMove(): Bool {
+    var k: Nat = rndInt(1, MOV_N())
+    return sfxPlay(concat("mov-", toStr(k)))
+}
 @impure
 fun sfxPlay(id: Str): Bool {
     return sndPlay(sfxFile(id))
